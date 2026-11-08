@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict';
+const R = new URL('../js/', import.meta.url).href;
+const { parseWords, parseRows, toCSV } = await import(R + 'csv.js');
+const Q = await import(R + 'quiz.js');
+const U = await import(R + 'util.js');
+
+// --- CSV
+let r = parseWords('english,polish\nhouse,dom\n"to run, jog",biegać\nsay "hi",cześć\nempty,\n');
+assert.equal(r.words.length, 3); assert.equal(r.skipped, 1);
+assert.equal(r.words[1].en, 'to run, jog');
+r = parseWords('english;polish\r\ncat;kot\r\ndog;pies');
+assert.deepEqual(r.words, [{en:'cat',pl:'kot'},{en:'dog',pl:'pies'}]);
+r = parseWords('﻿angielski,polski\nrun,biegać, uciekać\n');
+assert.deepEqual(r.words, [{en:'run', pl:'biegać, uciekać'}]);
+r = parseWords('apple,jabłko\npear,gruszka');           // bez nagłówka
+assert.equal(r.words.length, 2);
+r = parseWords('"say ""hi""","cześć, hej"\n');
+assert.deepEqual(r.words, [{en:'say "hi"', pl:'cześć, hej'}]);
+const back = parseWords(toCSV([{en:'a, b', pl:'c "d"'},{en:'x', pl:'y'}]));
+assert.deepEqual(back.words, [{en:'a, b', pl:'c "d"'},{en:'x', pl:'y'}]);
+assert.deepEqual(parseWords('').words, []);
+
+// --- normalizacja / odpowiedzi
+assert.equal(U.normalize('  Łąka. '), 'laka');
+assert.equal(U.normalize('Łąka', true), 'łąka');
+const q = {dir:'enpl', correct:'dom / budynek', q:'house'};
+assert.ok(Q.isCorrect(q, 'Budynek')); assert.ok(Q.isCorrect(q, 'dom'));
+assert.ok(!Q.isCorrect(q, '')); assert.ok(!Q.isCorrect(q, 'kot'));
+assert.ok(!Q.isCorrect({correct:'łąka'}, 'laka', true));
+
+// --- brak powtórzeń
+const words = Array.from({length: 12}, (_, i) => ({id:'w'+i, en:'en'+i, pl:'pl'+i}));
+for (let k = 0; k < 200; k++) {
+  const quiz = Q.buildStandardQuiz(words, 'all', 'both');
+  assert.equal(quiz.length, 12);
+  assert.equal(new Set(quiz.map(x => x.id)).size, 12);
+}
+assert.equal(Q.buildStandardQuiz(words, 30, 'enpl').length, 12);      // przycięte do puli
+assert.equal(Q.buildStandardQuiz(words, 10, 'enpl').length, 10);
+const src = Q.createSource(words.slice(0,3), 'plen'); let prev = null;
+for (let i = 0; i < 300; i++) { const x = src.next(); assert.notEqual(x.id, prev); prev = x.id; assert.equal(x.q, x.pl); }
+const one = Q.createSource(words.slice(0,1)); one.next(); one.next();   // jedno słówko nie zawiesza
+assert.throws(() => Q.createSource([]).next());
+
+// --- odpowiedzi do wyboru
+const qq = Q.makeQuestion({id:'x', en:"don't", pl:"nie rób / nie"}, 'enpl');
+const ch = Q.buildChoices(qq, words, words);
+assert.equal(ch.length, 4); assert.ok(ch.includes(qq.correct)); assert.equal(new Set(ch).size, 4);
+const few = Q.buildChoices(Q.makeQuestion(words[0],'enpl'), words.slice(0,2), words);
+assert.equal(few.length, 4);
+const tiny = Q.buildChoices(Q.makeQuestion(words[0],'enpl'), words.slice(0,2), []);
+assert.equal(tiny.length, 2);
+const dup = [{id:'a',en:'a',pl:'dom'},{id:'b',en:'b',pl:'dom'},{id:'c',en:'c',pl:'kot'}];
+assert.equal(Q.buildChoices(Q.makeQuestion(dup[0],'enpl'), dup, dup).length, 2);   // 'dom' nie jest błędną opcją dla 'dom'
+
+// --- SRS
+const t = 1_000_000_000_000;
+let w = {box:0, correct:0, wrong:0};
+w = {...w, ...Q.applyResult(w, true, t)}; assert.equal(w.box, 1); assert.equal(w.due, t + Q.DAY);
+for (let i = 0; i < 8; i++) w = {...w, ...Q.applyResult(w, true, t)};
+assert.equal(w.box, Q.MAX_BOX); assert.equal(w.due, t + 16*Q.DAY);
+w = {...w, ...Q.applyResult(w, false, t)}; assert.equal(w.box, 0); assert.equal(w.due, t); assert.equal(w.wrong, 1);
+assert.ok(Q.isDue({}, t)); assert.ok(Q.isDue({due:t-1}, t)); assert.ok(!Q.isDue({due:t+1}, t));
+assert.ok(Q.isHard({wrong:2, correct:1})); assert.ok(!Q.isHard({wrong:1, correct:3})); assert.ok(!Q.isHard({}));
+
+// --- czas i seria
+assert.equal(Q.parseDuration('1:30'), 90); assert.equal(Q.parseDuration('45'), 45);
+assert.equal(Q.parseDuration('abc'), 60); assert.equal(Q.parseDuration('0:01'), 10); assert.equal(Q.parseDuration('999:00'), 7200);
+const now = new Date(2026, 10, 5, 12).getTime(), d = (n, h=10) => new Date(2026, 10, 5 - n, h).getTime();
+assert.equal(Q.computeStreak([], now), 0);
+assert.equal(Q.computeStreak([{date:d(0)},{date:d(1)},{date:d(2)},{date:d(4)}], now), 3);
+assert.equal(Q.computeStreak([{date:d(1)},{date:d(2)}], now), 2);      // dziś jeszcze nie zerwało serii
+assert.equal(Q.computeStreak([{date:d(2)}], now), 0);
+assert.equal(U.esc(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
+assert.equal(U.fmtTime(75), '01:15');
+console.log('OK: wszystkie testy logiki przeszły');
