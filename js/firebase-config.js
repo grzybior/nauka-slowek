@@ -7,12 +7,12 @@
 // w tej przeglądarce (localStorage). Dobre do wypróbowania, ale bez synchronizacji.
 
 export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyAiDcQTy1mCTwm6jQ_FxSw4OlChSbAW3gU',
+  authDomain: 'nauka-slowek-3cc24.firebaseapp.com',
+  projectId: 'nauka-slowek-3cc24',
+  storageBucket: 'nauka-slowek-3cc24.firebasestorage.app',
+  messagingSenderId: '960058411491',
+  appId: '1:960058411491:web:52eeb9718e65b135cfb8d6',
 };
 
 export const isConfigured = () => Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
