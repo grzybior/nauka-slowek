@@ -342,7 +342,11 @@ label.inline .select { width: auto; min-width: 150px; }
 .q-tools .btn-icon.speak { width: 44px; height: 44px; background: var(--primary-soft); }
 .answers { display: grid; gap: 10px; margin-top: 4px; }
 .opt { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 58px; padding: 12px 16px; text-align: left; border-radius: 18px; border: 2px solid var(--border); background: var(--surface-solid); font-size: 17px; font-weight: 600; cursor: pointer; transition: border-color .15s, background .15s, transform .1s; }
-.opt:hover:not(.locked) { border-color: var(--primary); transform: translateY(-1px); }
+/* Podświetlenie tylko dla myszy i dopiero po jej ruchu (.nohover zdejmuje skrypt), żeby po zmianie pytania
+   odpowiedź pod nieruchomym kursorem nie wyglądała inaczej niż pozostałe. Na ekranach dotykowych hover nie istnieje. */
+@media (hover: hover) and (pointer: fine) {
+  .answers:not(.nohover) .opt:hover:not(.locked) { border-color: var(--primary); transform: translateY(-1px); }
+}
 .opt .key { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 9px; background: var(--surface-2); color: var(--muted); font-size: 13px; font-weight: 800; }
 .opt-text { overflow-wrap: anywhere; }
 .opt.locked { pointer-events: none; }

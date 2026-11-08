@@ -5,7 +5,7 @@ import { suggest } from '../translate.js';
 
 export const DIR_LABEL = { enpl: 'EN → PL', plen: 'PL → EN', both: 'EN ↔ PL' };
 export const MODE_LABEL = { standard: 'Standardowy', challenge: 'Na czas' };
-export const TYPE_LABEL = { choice: 'Wybór', spelling: 'Pisanie' };
+export const TYPE_LABEL = { choice: 'Wybór', spelling: 'Pisanie', mixed: 'Mieszany' };
 
 /** Wersja angielska pytania/odpowiedzi (do przycisku wymowy). */
 export const englishOf = (a) => (a.dir === 'enpl' ? a.q : a.correct);

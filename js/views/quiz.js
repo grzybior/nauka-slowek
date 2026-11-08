@@ -1,9 +1,9 @@
 // Widok quizu: pytania (wybór / pisanie), tryb standardowy i na czas, podsumowanie i zapis sesji.
 import { esc, fmtTime, pct } from '../util.js';
 import { icon, speakBtn, toast, openModal } from '../ui.js';
-import { speak, stopSpeaking } from '../speech.js';
+import { speak, stopSpeaking, whenSpoken } from '../speech.js';
 import { sOK, sBAD, sWIN, setSoundEnabled, unlockAudio } from '../sound.js';
-import { buildStandardQuiz, createSource, buildChoices, isCorrect } from '../quiz.js';
+import { buildStandardQuiz, createSource, buildChoices, isCorrect, pickKind } from '../quiz.js';
 import { takeLaunch } from '../launch.js';
 import * as store from '../store.js';
 import { answerRows, scoreRing, scoreMessage, DIR_LABEL } from './shared.js';
@@ -40,7 +40,8 @@ export function mount(el) {
       cfg, pool, all: store.state.words.slice(),
       idx: 0, score: 0, answers: [],
       awaiting: false, finished: false, saved: false,
-      start: Date.now(), q: null, choices: [], advance: null, tick: null,
+      start: Date.now(), q: null, kind: 'choice', choices: [], advance: null, tick: null,
+      byId: new Map(pool.map((w) => [w.id, w])), // stan opanowania słówek z początku quizu
     };
     if (cfg.mode === 'standard') {
       run.questions = buildStandardQuiz(pool, cfg.count, cfg.direction);
@@ -57,7 +58,6 @@ export function mount(el) {
 
   /* ---------- widok pytania ---------- */
   function renderPlay() {
-    const spelling = run.cfg.type === 'spelling';
     el.innerHTML = `
     <section class="quiz">
       <div class="quiz-top">
@@ -70,15 +70,15 @@ export function mount(el) {
         <div class="q-dir" id="qDir"></div>
         <div class="q-word" id="qWord"></div>
         <div class="q-tools" id="qTools"></div>
-        <div class="answers" id="qAnswers" ${spelling ? 'hidden' : ''}></div>
-        <form class="spell" id="qForm" ${spelling ? '' : 'hidden'} autocomplete="off">
+        <div class="answers nohover" id="qAnswers" hidden></div>
+        <form class="spell" id="qForm" hidden autocomplete="off">
           <input id="qInput" class="input big" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Wpisz tłumaczenie…" aria-label="Twoja odpowiedź">
           <button class="btn btn-primary btn-lg" id="qSubmit" type="submit">Sprawdź</button>
         </form>
         <div class="feedback" id="qFb" aria-live="polite"></div>
         <button type="button" class="btn btn-ghost btn-block" id="qNext" hidden>Dalej ${icon('right', 18)}</button>
       </div>
-      <p class="hint muted">${spelling ? 'Enter: sprawdź i przejdź dalej' : 'Klawisze 1–4: wybór odpowiedzi. Enter lub spacja: dalej'}</p>
+      <p class="hint muted" id="qHint"></p>
     </section>`;
 
     const $ = (s) => el.querySelector(s);
@@ -103,6 +103,12 @@ export function mount(el) {
     run.q = cfg.mode === 'standard' ? run.questions[run.idx] : run.source.next();
     run.awaiting = false;
     const q = run.q;
+    // Rodzaj pytania: w trybie mieszanym zależy od opanowania słówka (nowe: wybór, znane: pisanie).
+    run.kind = cfg.type === 'mixed' ? pickKind(run.byId.get(q.id), run.all.length >= 2) : (cfg.type === 'spelling' ? 'spelling' : 'choice');
+    const spelling = run.kind === 'spelling';
+    $q('#qAnswers').hidden = spelling;
+    $q('#qForm').hidden = !spelling;
+    $q('#qHint').textContent = spelling ? 'Enter: sprawdź i przejdź dalej' : 'Klawisze 1–4: wybór odpowiedzi. Enter lub spacja: dalej';
 
     $q('#qDir').textContent = DIR_LABEL[q.dir];
     $q('#qWord').textContent = q.q;
@@ -112,11 +118,15 @@ export function mount(el) {
     $q('#qNext').hidden = true;
     updateHud();
 
-    if (cfg.type === 'choice') {
+    if (!spelling) {
       run.choices = buildChoices(q, run.pool, run.all);
+      // Dopóki mysz się nie ruszy, żadna odpowiedź nie jest podświetlona (kursor zostaje w miejscu poprzedniego kliknięcia).
+      holdX = mx; holdY = my;
+      $q('#qAnswers').classList.add('nohover');
       $q('#qAnswers').innerHTML = run.choices
         .map((c, i) => `<button type="button" class="opt" data-i="${i}"><span class="key">${i + 1}</span><span class="opt-text">${esc(c)}</span></button>`)
         .join('');
+      if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
     } else {
       const input = $q('#qInput');
       input.value = '';
@@ -158,16 +168,16 @@ export function mount(el) {
   function answer(given, optEl) {
     if (!run || run.awaiting || run.finished) return;
     const cfg = run.cfg;
-    if (cfg.type === 'spelling' && !String(given).trim()) return;
+    if (run.kind === 'spelling' && !String(given).trim()) return;
     run.awaiting = true;
 
     const q = run.q;
     const ok = isCorrect(q, given, prefs().strict);
-    run.answers.push({ wid: q.id, q: q.q, correct: q.correct, given: String(given).trim(), ok, dir: q.dir });
+    run.answers.push({ wid: q.id, q: q.q, correct: q.correct, given: String(given).trim(), ok, dir: q.dir, kind: run.kind });
     if (ok) run.score++;
     ok ? sOK() : sBAD();
 
-    if (cfg.type === 'choice') {
+    if (run.kind === 'choice') {
       el.querySelectorAll('.opt').forEach((b) => {
         const txt = run.choices[Number(b.dataset.i)];
         b.classList.add('locked');
@@ -194,15 +204,25 @@ export function mount(el) {
     const nextBtn = $q('#qNext');
     nextBtn.hidden = false;
     nextBtn.innerHTML = last ? 'Zobacz wynik' : `Dalej ${icon('right', 18)}`;
-    if (cfg.type === 'choice') nextBtn.focus({ preventScroll: true });
+    if (run.kind === 'choice') nextBtn.focus({ preventScroll: true });
 
+    // Automatyczne przejście dalej: po przerwie, a dopiero gdy skończy się odczytywanie wymowy,
+    // żeby kolejne pytanie nie ucinało poprzedniego słowa.
     const delay = Number(prefs().delay) || 0;
-    if (delay > 0) run.advance = setTimeout(next, delay * 1000);
+    if (delay > 0) {
+      const mark = run.answers.length;
+      const myRun = run;
+      run.advance = setTimeout(async () => {
+        await whenSpoken();
+        if (run === myRun && !run.finished && run.awaiting && run.answers.length === mark) next();
+      }, delay * 1000);
+    }
   }
 
   function next() {
     if (!run || run.finished || !run.awaiting) return;
     clearTimeout(run.advance);
+    stopSpeaking(); // ręczne "Dalej" przerywa wymowę; przy automatycznym przejściu nic już nie gra
     if (run.cfg.mode === 'standard') {
       run.idx++;
       if (run.idx >= run.total) return finish();
@@ -217,7 +237,7 @@ export function mount(el) {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); next(); }
       return;
     }
-    if (run.cfg.type === 'choice') {
+    if (run.kind === 'choice') {
       const n = parseInt(e.key, 10);
       if (n >= 1 && n <= run.choices.length) {
         e.preventDefault();
@@ -226,6 +246,14 @@ export function mount(el) {
     }
   }
   document.addEventListener('keydown', onKey);
+
+  // Podświetlenie odpowiedzi włącza się dopiero po prawdziwym ruchu myszy (nie po zmianie pytania pod kursorem).
+  let mx = -1, my = -1, holdX = -2, holdY = -2;
+  function onMove(e) {
+    mx = e.clientX; my = e.clientY;
+    if (mx !== holdX || my !== holdY) el.querySelector('#qAnswers')?.classList.remove('nohover');
+  }
+  document.addEventListener('mousemove', onMove);
 
   /* ---------- zakończenie ---------- */
   function onExit() {
@@ -319,6 +347,7 @@ export function mount(el) {
     destroy() {
       destroyed = true;
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousemove', onMove);
       if (run) { clearTimeout(run.advance); clearInterval(run.tick); }
       stopSpeaking();
     },

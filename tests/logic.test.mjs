@@ -73,4 +73,21 @@ assert.equal(Q.computeStreak([{date:d(1)},{date:d(2)}], now), 2);      // dziś 
 assert.equal(Q.computeStreak([{date:d(2)}], now), 0);
 assert.equal(U.esc(`<a href="x">'&'</a>`), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
 assert.equal(U.fmtTime(75), '01:15');
+// --- tryb mieszany: rodzaj pytania
+assert.equal(Q.pickKind({ box: 0 }, false), 'spelling');                 // za mało słówek na wybór
+assert.equal(Q.pickKind({ box: 0 }, true, 0.5), 'choice');                // nowe słówko: wybór
+assert.equal(Q.pickKind({ box: 5 }, true, 0.5), 'spelling');              // dobrze znane: pisanie
+assert.equal(Q.pickKind(undefined, true, 0.5), 'choice');                 // brak danych = traktuj jak nowe
+{
+  let prev = -1;
+  for (let b = 0; b <= 5; b++) {                                          // szansa rośnie z poziomem i mieści się w 0..1
+    const c = Q.spellingChance({ box: b, correct: 5, wrong: 0 });
+    assert.ok(c >= prev && c >= 0 && c <= 1); prev = c;
+  }
+  assert.ok(Q.spellingChance({ box: 4, correct: 1, wrong: 3 }) < Q.spellingChance({ box: 4, correct: 5, wrong: 0 })); // trudne: więcej wyboru
+  assert.equal(Q.spellingChance({ box: 99 }), Q.spellingChance({ box: Q.MAX_BOX }));
+  const freq = (w) => Array.from({ length: 6000 }, () => Q.pickKind(w)).filter((k) => k === 'spelling').length / 6000;
+  assert.ok(Math.abs(freq({ box: 0 }) - 0.1) < 0.03, 'box 0 ~10% pisania');
+  assert.ok(Math.abs(freq({ box: 4 }) - 0.85) < 0.03, 'box 4 ~85% pisania');
+}
 console.log('OK: wszystkie testy logiki przeszły');

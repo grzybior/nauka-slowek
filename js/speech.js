@@ -21,7 +21,10 @@ function pickVoice(lang) {
   return pool.find((v) => PREFERRED.test(v.name)) || pool[0] || null;
 }
 
-/** accent: 'us' | 'gb'; slow: wolniejsze tempo. */
+// Obietnica kończąca się, gdy bieżąca wymowa dobiegnie końca (albo zostanie przerwana).
+let current = Promise.resolve();
+
+/** accent: 'us' | 'gb'; slow: wolniejsze tempo. Rozpoczęcie nowej wymowy przerywa poprzednią. */
 export function speak(text, { accent = 'us', slow = false } = {}) {
   if (!canSpeak || !text) return;
   const lang = accent === 'gb' ? 'en-GB' : 'en-US';
@@ -32,7 +35,31 @@ export function speak(text, { accent = 'us', slow = false } = {}) {
   const v = pickVoice(lang);
   if (v) u.voice = v;
   u.rate = slow ? 0.65 : 0.95;
+
+  current = new Promise((resolve) => {
+    let done = false;
+    let timer = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    u.onend = finish;
+    u.onerror = finish;
+    // Zabezpieczenie: niektóre przeglądarki bywają, że nie wywołują onend (np. brak głosu).
+    timer = setTimeout(finish, 3000 + (text.length * 180) / u.rate);
+  });
   synth.speak(u);
+}
+
+/** Czeka, aż skończy się wszystko, co jest teraz odtwarzane (także wymowa uruchomiona w międzyczasie). */
+export async function whenSpoken() {
+  let p;
+  do {
+    p = current;
+    await p;
+  } while (p !== current);
 }
 
 export function stopSpeaking() {

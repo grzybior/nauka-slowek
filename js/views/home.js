@@ -71,7 +71,7 @@ export function mount(el) {
         </div>
         <div class="setup-grid">
           <div class="field"><label>Kierunek</label>${seg('direction', [['enpl', 'EN → PL'], ['plen', 'PL → EN'], ['both', 'Oba']], draft.direction)}</div>
-          <div class="field"><label>Zadanie</label>${seg('type', [['choice', 'Wybór'], ['spelling', 'Pisanie']], draft.type)}</div>
+          <div class="field"><label>Zadanie</label>${seg('type', [['choice', 'Wybór'], ['spelling', 'Pisanie'], ['mixed', 'Mieszany']], draft.type)}</div>
           <div class="field"><label>Tryb</label>${seg('mode', [['standard', 'Liczba pytań'], ['challenge', 'Na czas']], draft.mode)}</div>
           <div class="field" id="countField"><label for="fCount">Liczba pytań</label>
             <select id="fCount" class="select">${COUNTS.map((c) => `<option value="${c}" ${c === String(draft.count) ? 'selected' : ''}>${c === 'all' ? 'Wszystkie' : c}</option>`).join('')}</select></div>

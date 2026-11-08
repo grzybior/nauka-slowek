@@ -6,6 +6,28 @@ export const DAY = 86400000;
 export const INTERVALS_DAYS = [0, 1, 2, 4, 8, 16];
 export const MAX_BOX = INTERVALS_DAYS.length - 1;
 
+/** Szansa na pytanie pisaniem (zamiast wyboru) zależnie od poziomu opanowania słówka (pudełka 0..5). */
+const SPELLING_CHANCE = [0.1, 0.3, 0.5, 0.7, 0.85, 0.9];
+
+/**
+ * Szansa (0..1), że słówko zostanie zadane pisaniem w quizie mieszanym.
+ * Nowe słówka wypadają głównie jako wybór (łatwiej rozpoznać), dobrze znane głównie jako pisanie.
+ * Słówka trudne (więcej błędów niż trafień) dostają dodatkowo więcej wyboru.
+ */
+export function spellingChance(w) {
+  const base = SPELLING_CHANCE[Math.min(Math.max((w && w.box) || 0, 0), MAX_BOX)];
+  return w && isHard(w) ? Math.max(0, base - 0.25) : base;
+}
+
+/**
+ * Rodzaj pytania w quizie mieszanym: 'spelling' albo 'choice'.
+ * canChoose = false, gdy w bazie jest za mało słówek na odpowiedzi do wyboru. rnd pozwala na deterministyczne testy.
+ */
+export function pickKind(w, canChoose = true, rnd = Math.random()) {
+  if (!canChoose) return 'spelling';
+  return rnd < spellingChance(w) ? 'spelling' : 'choice';
+}
+
 /** Słówko czeka na powtórkę (nowe albo z minionym terminem). */
 export const isDue = (w, now = Date.now()) => !w.due || w.due <= now;
 /** Słówko sprawia kłopot: błędów jest co najmniej tyle, co poprawnych odpowiedzi. */

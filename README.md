@@ -10,7 +10,7 @@ Aplikacja do nauki słówek angielsko-polskich. Działa w przeglądarce na kompu
 - **Wymowa**: przycisk 🔊 (oraz wolniej 🐢) przy każdym angielskim słówku, akcent amerykański lub brytyjski. Korzysta z syntezy mowy wbudowanej w przeglądarkę.
 - **Import i eksport CSV** (przecinek, średnik i tabulator; cudzysłowy; pliki z Excela w windows-1250), także przez przeciągnięcie pliku na stronę.
 - **Powtórki rozłożone w czasie** (system Leitnera): słówko poprawnie odpowiedziane wraca po 1, 2, 4, 8, 16 dniach, błędnie od razu. Zestaw „Na dziś” zbiera to, co czeka na powtórkę, a „Trudne słówka” to te, w których błędów jest więcej niż trafień.
-- **Quiz**: wybór lub pisanie, kierunek EN→PL / PL→EN / oba, tryb na liczbę pytań lub na czas, bez powtórzeń słówek w jednym quizie, skróty klawiaturowe (1–4, Enter).
+- **Quiz**: wybór, pisanie albo **tryb mieszany** (rodzaj pytania zależy od tego, jak dobrze znasz słówko: nowe i trudne dostają głównie wybór, dobrze opanowane głównie pisanie; działa też w powtórce „Na dziś”), kierunek EN→PL / PL→EN / oba, tryb na liczbę pytań lub na czas, bez powtórzeń słówek w jednym quizie, skróty klawiaturowe (1–4, Enter). Po odpowiedzi PL→EN aplikacja czyta poprawne angielskie słowo i dopiero po skończeniu odczytu przechodzi do kolejnego pytania.
 - **Historia**: każda sesja z wynikiem, czasem i pełną listą odpowiedzi (błędy z Twoją odpowiedzią i poprawną), wykres skuteczności, najtrudniejsze słówka, przycisk „Ćwicz błędne”.
 - Jasny i ciemny motyw, układ dopasowany do telefonu (dolna nawigacja).
 

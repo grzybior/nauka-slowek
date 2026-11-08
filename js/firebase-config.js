@@ -1,9 +1,9 @@
-// Konfiguracja Firebase. Wklej tutaj dane swojego projektu (instrukcja w README.md, krok 3).
+// Konfiguracja Firebase projektu nauka-slowek-3cc24.
 //
 // To NIE są tajne klucze: konfiguracja webowa Firebase jest z założenia publiczna.
 // Dane chronią reguły Firestore z pliku firestore.rules (każdy widzi tylko swoje).
 //
-// Dopóki pola są puste, aplikacja działa w trybie DEMO: konta i dane żyją tylko
+// Gdy pola są puste, aplikacja działa w trybie DEMO: konta i dane żyją tylko
 // w tej przeglądarce (localStorage). Dobre do wypróbowania, ale bez synchronizacji.
 
 export const firebaseConfig = {
