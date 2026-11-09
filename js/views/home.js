@@ -3,9 +3,10 @@ import { esc, plural, fmtDate, fmtTime } from '../util.js';
 import { icon, seg, bindSegs, toast, isTyping } from '../ui.js';
 import * as store from '../store.js';
 import { setLaunch, takePreselect } from '../launch.js';
-import { STARTER_WORDS, STARTER_NAME } from '../starter.js';
+import { starterWords, STARTER_NAME } from '../starter.js';
+import { dirLabel, langInfo } from '../languages.js';
 import { parseDuration } from '../quiz.js';
-import { scoreRing, accuracyOf, DIR_LABEL, MODE_LABEL, TYPE_LABEL } from './shared.js';
+import { scoreRing, accuracyOf, MODE_LABEL, TYPE_LABEL } from './shared.js';
 
 const COUNTS = ['10', '20', '30', '50', 'all'];
 
@@ -54,7 +55,7 @@ export function mount(el) {
         <p class="muted">Dodaj własne słówka (z podpowiedzią tłumaczenia), zaimportuj plik CSV albo wczytaj mały zestaw na próbę.</p>
         <div class="row center">
           <a class="btn btn-primary" href="#/words">${icon('plus', 18)} Dodaj słówka</a>
-          <button class="btn btn-ghost" id="btnStarter">${icon('sparkles', 18)} Wczytaj przykładowe (${STARTER_WORDS.length})</button>
+          <button class="btn btn-ghost" id="btnStarter">${icon('sparkles', 18)} Wczytaj przykładowe (${starterWords(store.state.lang).length})</button>
         </div>
       </div>` : `
       ${st.due ? `
@@ -70,7 +71,7 @@ export function mount(el) {
           <select id="fList" class="select">${lists.map((l) => `<option value="${esc(l.id)}" ${l.id === draft.listId ? 'selected' : ''}>${esc(l.name)} (${store.poolFor(l.id).length})</option>`).join('')}</select>
         </div>
         <div class="setup-grid">
-          <div class="field"><label>Kierunek</label>${seg('direction', [['enpl', 'EN → PL'], ['plen', 'PL → EN'], ['both', 'Oba']], draft.direction)}</div>
+          <div class="field"><label>Kierunek</label>${seg('direction', [['enpl', dirLabel('enpl', store.state.lang)], ['plen', dirLabel('plen', store.state.lang)], ['both', 'Oba']], draft.direction)}</div>
           <div class="field"><label>Zadanie</label>${seg('type', [['choice', 'Wybór'], ['spelling', 'Pisanie'], ['mixed', 'Mieszany']], draft.type)}</div>
           <div class="field"><label>Tryb</label>${seg('mode', [['standard', 'Liczba pytań'], ['challenge', 'Na czas']], draft.mode)}</div>
           <div class="field" id="countField"><label for="fCount">Liczba pytań</label>
@@ -114,7 +115,7 @@ export function mount(el) {
   function bind() {
     el.querySelector('#btnStarter')?.addEventListener('click', async (e) => {
       e.target.disabled = true;
-      const r = await store.importWords(STARTER_WORDS, { newListName: STARTER_NAME });
+      const r = await store.importWords(starterWords(store.state.lang), { newListName: STARTER_NAME });
       toast(`Dodano ${r.added} słówek do listy „${STARTER_NAME}”.`, 'success');
     });
 

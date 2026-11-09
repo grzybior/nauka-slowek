@@ -6,7 +6,7 @@ import { sOK, sBAD, sWIN, setSoundEnabled, unlockAudio } from '../sound.js';
 import { buildStandardQuiz, createSource, buildChoices, isCorrect, pickKind } from '../quiz.js';
 import { takeLaunch } from '../launch.js';
 import * as store from '../store.js';
-import { answerRows, scoreRing, scoreMessage, DIR_LABEL } from './shared.js';
+import { answerRows, scoreRing, scoreMessage, dirLabel } from './shared.js';
 
 export function mount(el) {
   const initial = takeLaunch();
@@ -110,7 +110,7 @@ export function mount(el) {
     $q('#qForm').hidden = !spelling;
     $q('#qHint').textContent = spelling ? 'Enter: sprawdź i przejdź dalej' : 'Klawisze 1–4: wybór odpowiedzi. Enter lub spacja: dalej';
 
-    $q('#qDir').textContent = DIR_LABEL[q.dir];
+    $q('#qDir').textContent = dirLabel(q.dir, store.state.lang);
     $q('#qWord').textContent = q.q;
     $q('#qTools').innerHTML = q.dir === 'enpl' ? speakBtn(q.q) + speakBtn(q.q, { slow: true }) : '';
     $q('#qFb').textContent = '';
@@ -135,7 +135,7 @@ export function mount(el) {
       $q('#qSubmit').textContent = 'Sprawdź';
       input.focus({ preventScroll: true });
     }
-    if (prefs().autoSpeak && q.dir === 'enpl') speak(q.q, { accent: prefs().accent });
+    if (prefs().autoSpeak && q.dir === 'enpl') speak(q.q, { lang: store.state.lang, accent: store.accentFor() });
   }
 
   function updateHud() {
@@ -196,7 +196,7 @@ export function mount(el) {
 
     if (q.dir === 'plen') {
       $q('#qTools').innerHTML = speakBtn(q.correct) + speakBtn(q.correct, { slow: true });
-      if (prefs().autoSpeak) speak(q.correct, { accent: prefs().accent });
+      if (prefs().autoSpeak) speak(q.correct, { lang: store.state.lang, accent: store.accentFor() });
     }
     updateHud();
 

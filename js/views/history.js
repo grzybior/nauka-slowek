@@ -3,7 +3,7 @@ import { esc, plural, fmtDate, fmtTime, pct } from '../util.js';
 import { icon, speakBtn, toast, confirmDialog } from '../ui.js';
 import { setLaunch, setPreselect } from '../launch.js';
 import * as store from '../store.js';
-import { answerRows, scoreRing, toneOf, accuracyOf, DIR_LABEL, MODE_LABEL, TYPE_LABEL } from './shared.js';
+import { answerRows, scoreRing, toneOf, accuracyOf, dirLabel, MODE_LABEL, TYPE_LABEL } from './shared.js';
 
 export function mount(el, ctx) {
   const id = ctx.params.id;
@@ -16,7 +16,7 @@ export function mount(el, ctx) {
       ${scoreRing(p, 'sm')}
       <div class="sess-main">
         <div class="sess-title">${esc(x.listName || 'Quiz')}</div>
-        <div class="sess-sub">${fmtDate(x.date)} · ${MODE_LABEL[x.mode] || ''} · ${TYPE_LABEL[x.type] || ''} · ${DIR_LABEL[x.direction] || ''}</div>
+        <div class="sess-sub">${fmtDate(x.date)} · ${MODE_LABEL[x.mode] || ''} · ${TYPE_LABEL[x.type] || ''} · ${dirLabel(x.direction, x.lang) || ''}</div>
       </div>
       <div class="sess-score"><b>${x.score}/${x.total}</b><span>${errs ? `${errs} ${plural(errs, 'błąd', 'błędy', 'błędów')}` : 'bez błędów'} · ${fmtTime(x.duration || 0)}</span></div>
       ${icon('right', 18)}</a>`;
@@ -55,7 +55,7 @@ export function mount(el, ctx) {
       ${hard.length ? `
       <div class="card">
         <div class="section-head tight"><h2>Najtrudniejsze słówka</h2><button class="btn btn-ghost btn-sm" id="btnHard">${icon('target', 16)} Ćwicz trudne</button></div>
-        <ul class="hard-list">${hard.map((w) => `<li><span class="w-en">${esc(w.en)}${speakBtn(w.en)}</span><span class="muted">${esc(w.pl)}</span><span class="tag bad">${w.wrong} ${plural(w.wrong, 'błąd', 'błędy', 'błędów')}</span></li>`).join('')}</ul>
+        <ul class="hard-list">${hard.map((w) => `<li><span class="w-en">${esc(w.term)}${speakBtn(w.term)}</span><span class="muted">${esc(w.pl)}</span><span class="tag bad">${w.wrong} ${plural(w.wrong, 'błąd', 'błędy', 'błędów')}</span></li>`).join('')}</ul>
       </div>` : ''}
 
       <div class="section-head"><h2>Wszystkie sesje</h2></div>
@@ -87,7 +87,7 @@ export function mount(el, ctx) {
           <h1>${esc(s.listName || 'Quiz')}</h1>
           <p class="muted">${fmtDate(s.date)}</p>
           <div class="tags">
-            <span class="tag">${MODE_LABEL[s.mode] || ''}</span><span class="tag">${TYPE_LABEL[s.type] || ''}</span><span class="tag">${DIR_LABEL[s.direction] || ''}</span>
+            <span class="tag">${MODE_LABEL[s.mode] || ''}</span><span class="tag">${TYPE_LABEL[s.type] || ''}</span><span class="tag">${dirLabel(s.direction, s.lang) || ''}</span>
             <span class="tag">${icon('clock', 12)} ${fmtTime(s.duration || 0)}</span>
           </div>
           <p class="detail-score"><b>${s.score}</b> z ${s.total} poprawnych, <b class="${wrong.length ? 'bad-text' : 'ok-text'}">${wrong.length}</b> ${plural(wrong.length, 'błąd', 'błędy', 'błędów')}</p>

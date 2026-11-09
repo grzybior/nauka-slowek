@@ -1,10 +1,74 @@
 rules_version = '2';
 
-// Każdy zalogowany użytkownik ma dostęp wyłącznie do własnych danych (users/{jego uid}/...).
+// Reguły bezpieczeństwa Słowika.
+//  - Dostęp do danych ma tylko właściciel z POTWIERDZONYM e-mailem, z istniejącym profilem i bez blokady.
+//  - Profil (profiles/{uid}) powstaje tylko, gdy rejestracja jest otwarta (config/app.registrationOpen).
+//  - Administrator = użytkownik z dokumentem admins/{jego uid} (dodajesz go ręcznie w konsoli Firebase, README).
+//  - Limity długości tekstów chronią przed wpisywaniem ogromnych danych.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function verified() { return request.auth != null && request.auth.token.email_verified == true; }
+    function isAdmin() { return verified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function isOwner(uid) { return verified() && request.auth.uid == uid; }
+    function notBlocked(uid) { return get(/databases/$(database)/documents/profiles/$(uid)).data.get('blocked', false) != true; }
+    function active(uid) {
+      return isOwner(uid) && exists(/databases/$(database)/documents/profiles/$(uid)) && notBlocked(uid);
+    }
+    function shortText(v) { return v is string && v.size() <= 200; }
+    function registrationOpen() {
+      return !exists(/databases/$(database)/documents/config/app)
+        || get(/databases/$(database)/documents/config/app).data.get('registrationOpen', true) != false;
+    }
+
+    // ----- dane użytkownika -----
+    match /users/{uid}/words/{id} {
+      allow read, delete: if active(uid) || isAdmin();
+      allow create, update: if active(uid)
+        && shortText(request.resource.data.get('term', ''))
+        && shortText(request.resource.data.get('en', ''))
+        && shortText(request.resource.data.get('pl', ''));
+    }
+    match /users/{uid}/lists/{id} {
+      allow read, delete: if active(uid) || isAdmin();
+      allow create, update: if active(uid) && shortText(request.resource.data.get('name', ''));
+    }
+    match /users/{uid}/sessions/{id} {
+      allow read, delete: if active(uid) || isAdmin();
+      allow create, update: if active(uid) && request.resource.data.get('answers', []).size() <= 500;
+    }
+    match /users/{uid}/settings/{id} {
+      allow read, write: if active(uid);
+      allow delete: if isAdmin();
+    }
+
+    // ----- profile, administracja, kontakt -----
+    match /profiles/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && registrationOpen()
+        && request.resource.data.blocked == false
+        && request.resource.data.keys().hasOnly(['email', 'name', 'createdAt', 'lastActive', 'warnedAt', 'blocked']);
+      allow update: if isAdmin()
+        || (isOwner(uid) && notBlocked(uid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActive', 'name', 'email', 'warnedAt'])
+            && request.resource.data.get('warnedAt', 0) == 0);
+      allow delete: if isAdmin();
+    }
+    match /admins/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if false;
+    }
+    match /config/app {
+      allow read: if true;           // potrzebne, by ekran logowania wiedział, czy rejestracja jest otwarta
+      allow write: if isAdmin();
+    }
+    match /messages/{id} {
+      allow create: if active(request.auth.uid)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 5 && request.resource.data.text.size() <= 2000
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'name', 'text', 'createdAt', 'read'])
+        && request.resource.data['read'] == false;
+      allow read, update, delete: if isAdmin();
     }
   }
 }

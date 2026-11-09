@@ -26,9 +26,11 @@ export const fmtDay = (ts) =>
  * strict = true -> polskie znaki mają znaczenie (ł ≠ l, ą ≠ a).
  */
 export function normalize(s, strict = false) {
-  let t = String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/[.!?]+$/, '').trim();
+  let t = String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/^[¿¡]+/, '').replace(/[.!?]+$/, '').trim();
   if (!strict) {
-    t = t.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
+    // Bez rozróżniania znaków diakrytycznych: ą→a, ñ→n, é→e, ü→u, a także ß→ss, œ→oe, æ→ae, ł→l, ø→o.
+    t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/ß/g, 'ss').replace(/œ/g, 'oe').replace(/æ/g, 'ae').replace(/ł/g, 'l').replace(/ø/g, 'o');
   }
   return t;
 }

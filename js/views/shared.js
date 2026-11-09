@@ -2,13 +2,13 @@
 import { esc, debounce, pct } from '../util.js';
 import { icon, speakBtn } from '../ui.js';
 import { suggest } from '../translate.js';
+export { dirLabel } from '../languages.js';
 
-export const DIR_LABEL = { enpl: 'EN → PL', plen: 'PL → EN', both: 'EN ↔ PL' };
 export const MODE_LABEL = { standard: 'Standardowy', challenge: 'Na czas' };
 export const TYPE_LABEL = { choice: 'Wybór', spelling: 'Pisanie', mixed: 'Mieszany' };
 
-/** Wersja angielska pytania/odpowiedzi (do przycisku wymowy). */
-export const englishOf = (a) => (a.dir === 'enpl' ? a.q : a.correct);
+/** Wersja w języku obcym pytania/odpowiedzi (do przycisku wymowy). */
+export const termOf = (a) => (a.dir === 'enpl' ? a.q : a.correct);
 
 export function answerRows(answers) {
   return answers
@@ -21,7 +21,7 @@ export function answerRows(answers) {
             ? esc(a.correct)
             : `<span class="given">${esc(a.given || '—')}</span><span class="arrow" aria-hidden="true">→</span><strong>${esc(a.correct)}</strong>`}</div>
         </div>
-        ${speakBtn(englishOf(a))}
+        ${speakBtn(termOf(a))}
       </li>`)
     .join('');
 }
@@ -42,18 +42,19 @@ export function scoreMessage(percent) {
 export const accuracyOf = (s) => pct(s.score, s.total);
 
 /**
- * Podpowiedzi tłumaczeń pod dwoma polami (EN/PL).
+ * Podpowiedzi tłumaczeń pod dwoma polami (język obcy / polski); lang to kod języka obcego.
  * Podpowiedzi pojawiają się dla pola, w którym użytkownik pisze, gdy drugie pole jest puste.
  * Kliknięcie wstawia tłumaczenie (kolejne kliknięcie dopisuje następne znaczenie po " / ").
  */
-export function attachSuggest(enEl, plEl, box) {
+export function attachSuggest(termEl, plEl, box, lang = 'en') {
   let ctrl = null;
-  const fields = { en: enEl, pl: plEl };
+  const fields = { term: termEl, pl: plEl };
+  const code = { term: lang, pl: 'pl' };
 
   const clear = () => { ctrl?.abort(); box.innerHTML = ''; };
 
   const run = debounce(async (fromKey) => {
-    const toKey = fromKey === 'en' ? 'pl' : 'en';
+    const toKey = fromKey === 'term' ? 'pl' : 'term';
     const src = fields[fromKey];
     const text = src.value.trim();
     if (text.length < 2 || fields[toKey].value.trim()) { clear(); return; }
@@ -61,7 +62,7 @@ export function attachSuggest(enEl, plEl, box) {
     ctrl = new AbortController();
     box.innerHTML = '<span class="sugg-note">Szukam tłumaczenia…</span>';
     try {
-      const list = await suggest(text, fromKey, toKey, ctrl.signal);
+      const list = await suggest(text, code[fromKey], code[toKey], ctrl.signal);
       if (src.value.trim() !== text) return;
       box.innerHTML = list.length
         ? `<span class="sugg-note">Podpowiedź:</span>${list.map((s) => `<button type="button" class="chip" data-fill="${esc(s)}" data-to="${toKey}">${esc(s)}</button>`).join('')}`
@@ -74,7 +75,7 @@ export function attachSuggest(enEl, plEl, box) {
     }
   }, 450);
 
-  enEl.addEventListener('input', () => run('en'));
+  termEl.addEventListener('input', () => run('term'));
   plEl.addEventListener('input', () => run('pl'));
   box.addEventListener('click', (e) => {
     const b = e.target.closest('[data-fill]');

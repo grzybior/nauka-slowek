@@ -1,7 +1,8 @@
 // Wczytywanie i zapisywanie plików CSV.
 // Obsługuje cudzysłowy, przecinek / średnik / tabulator, BOM oraz opcjonalny nagłówek.
 
-const EN_HEADERS = ['english', 'angielski', 'en', 'eng'];
+// Nagłówek kolumny ze słówkiem obcym (nazwa języka po angielsku/polsku, kod albo ogólne "term").
+const TERM_HEADERS = ['term', 'word', 'słówko', 'slowko', 'english', 'angielski', 'spanish', 'hiszpański', 'hiszpanski', 'german', 'niemiecki', 'french', 'francuski', 'italian', 'włoski', 'wloski', 'swedish', 'szwedzki', 'sv', 'en', 'es', 'de', 'fr', 'it', 'eng'];
 const PL_HEADERS = ['polish', 'polski', 'pl', 'pol'];
 
 function countOutsideQuotes(line, ch) {
@@ -47,14 +48,14 @@ export function parseRows(text) {
 
 /**
  * Zamienia tekst CSV na listę słówek.
- * Zwraca { words: [{en, pl}], skipped } — skipped to liczba odrzuconych wierszy.
+ * Zwraca { words: [{term, pl}], skipped } — skipped to liczba odrzuconych wierszy.
  */
 export function parseWords(text) {
   const rows = parseRows(text);
   if (!rows.length) return { words: [], skipped: 0 };
 
   const head = rows[0].map((h) => h.trim().toLowerCase());
-  let eIdx = head.findIndex((h) => EN_HEADERS.includes(h));
+  let eIdx = head.findIndex((h) => TERM_HEADERS.includes(h));
   let pIdx = head.findIndex((h) => PL_HEADERS.includes(h));
   let body = rows;
   const hasHeader = eIdx !== -1 && pIdx !== -1;
@@ -65,10 +66,10 @@ export function parseWords(text) {
   const words = [];
   let skipped = 0;
   for (const r of body) {
-    const en = (r[eIdx] ?? '').trim();
+    const term = (r[eIdx] ?? '').trim();
     // Jeśli polskie znaczenie zawierało nieocytowane przecinki, sklejamy je z powrotem.
     const pl = (lastColIsPl && pIdx > eIdx ? r.slice(pIdx).map((x) => x.trim()).join(', ') : r[pIdx] ?? '').trim();
-    if (en && pl) words.push({ en, pl });
+    if (term && pl) words.push({ term, pl });
     else skipped++;
   }
   return { words, skipped };
@@ -77,5 +78,5 @@ export function parseWords(text) {
 const quote = (v) => (/[",;\n\r]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v));
 
 export function toCSV(words) {
-  return 'english,polish\n' + words.map((w) => quote(w.en) + ',' + quote(w.pl)).join('\n') + '\n';
+  return 'term,polish\n' + words.map((w) => quote(w.term) + ',' + quote(w.pl)).join('\n') + '\n';
 }

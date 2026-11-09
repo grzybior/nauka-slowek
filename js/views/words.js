@@ -7,9 +7,13 @@ import { isHard } from '../quiz.js';
 import { setPreselect } from '../launch.js';
 import * as store from '../store.js';
 import { attachSuggest } from './shared.js';
+import { langInfo } from '../languages.js';
+import { packsFor } from '../starter.js';
+import { MAX_FILE_BYTES, MAX_IMPORT_ROWS } from '../limits.js';
 
 const PAGE = 100;
-const wkey = (w) => normalize(w.en) + '|' + normalize(w.pl);
+const MAX_WORDS_TXT = '10 000';
+const wkey = (w) => normalize(w.term) + '|' + normalize(w.pl);
 const slug = (s) => normalize(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'slowka';
 
 async function readText(file) {
@@ -28,6 +32,7 @@ function uniqueListName(base) {
 }
 
 export function mount(el) {
+  const LANG = store.state.lang, L = langInfo(LANG);
   const v = { listId: 'all', q: '', sort: 'new', selecting: false, selected: new Set(), limit: PAGE, addList: '' };
   let listsKey = '';
 
@@ -36,6 +41,7 @@ export function mount(el) {
     <div class="page-head">
       <h1>Moje słówka</h1>
       <div class="row tight">
+        <button type="button" class="btn btn-ghost" id="btnPacks">${icon('sparkles', 18)} <span>Gotowe zestawy</span></button>
         <button type="button" class="btn btn-ghost" id="btnImport">${icon('upload', 18)} <span>Importuj CSV</span></button>
         <button type="button" class="btn btn-ghost" id="btnExport">${icon('download', 18)} <span>Eksport</span></button>
         <input type="file" id="fileCsv" accept=".csv,.txt,text/csv,text/plain" hidden>
@@ -48,11 +54,11 @@ export function mount(el) {
     <form class="card add" id="addForm" autocomplete="off">
       <h2>Dodaj słówko</h2>
       <div class="add-grid">
-        <div class="field"><label for="aEn">Angielski</label>
-          <div class="input-wrap"><input id="aEn" class="input" type="text" lang="en" autocapitalize="off" spellcheck="false" placeholder="np. to look for">
+        <div class="field"><label for="aEn">${esc(L.name)}</label>
+          <div class="input-wrap"><input id="aEn" class="input" type="text" lang="${LANG}" autocapitalize="off" spellcheck="false" placeholder="np. ${esc(L.example[0])}">
           ${canSpeak ? `<button type="button" class="btn-icon in-input speak" id="aSpeak" data-say="" disabled aria-label="Posłuchaj wymowy">${icon('volume', 18)}</button>` : ''}</div></div>
         <div class="field"><label for="aPl">Polski</label>
-          <input id="aPl" class="input" type="text" lang="pl" placeholder="np. szukać"></div>
+          <input id="aPl" class="input" type="text" lang="pl" placeholder="np. ${esc(L.example[1])}"></div>
       </div>
       <div class="sugg" id="aSugg" aria-live="polite"></div>
       <div class="add-foot">
@@ -78,7 +84,7 @@ export function mount(el) {
 
   const $ = (s) => el.querySelector(s);
   const aEn = $('#aEn'), aPl = $('#aPl'), aList = $('#aList');
-  const sugg = attachSuggest(aEn, aPl, $('#aSugg'));
+  const sugg = attachSuggest(aEn, aPl, $('#aSugg'), LANG);
 
   /* ---------- widok listy ---------- */
   function ensureListValid() {
@@ -89,8 +95,8 @@ export function mount(el) {
   function visible() {
     let w = store.poolFor(v.listId).slice();
     const q = normalize(v.q);
-    if (q) w = w.filter((x) => normalize(x.en).includes(q) || normalize(x.pl).includes(q));
-    if (v.sort === 'az') w.sort((a, b) => a.en.localeCompare(b.en, 'en', { sensitivity: 'base' }));
+    if (q) w = w.filter((x) => normalize(x.term).includes(q) || normalize(x.pl).includes(q));
+    if (v.sort === 'az') w.sort((a, b) => a.term.localeCompare(b.term, LANG, { sensitivity: 'base' }));
     else if (v.sort === 'hard') w.sort((a, b) => (b.wrong || 0) - (a.wrong || 0) || (a.box || 0) - (b.box || 0));
     else w.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return w;
@@ -129,15 +135,15 @@ export function mount(el) {
     const tags = (w.listIds || []).map((id) => store.state.lists.find((l) => l.id === id)).filter(Boolean);
     const sel = v.selected.has(w.id);
     return `<li class="word${sel ? ' selected' : ''}${isHard(w) ? ' hard' : ''}" data-id="${esc(w.id)}">
-      ${v.selecting ? `<input type="checkbox" class="chk" data-sel aria-label="Zaznacz ${esc(w.en)}" ${sel ? 'checked' : ''}>` : ''}
+      ${v.selecting ? `<input type="checkbox" class="chk" data-sel aria-label="Zaznacz ${esc(w.term)}" ${sel ? 'checked' : ''}>` : ''}
       <div class="word-main">
-        <div class="w-en"><span>${esc(w.en)}</span>${speakBtn(w.en)}</div>
+        <div class="w-en"><span>${esc(w.term)}</span>${speakBtn(w.term)}</div>
         <div class="w-pl">${esc(w.pl)}</div>
         <div class="w-meta">${pips(w)}${(w.wrong || 0) ? `<span class="tag bad">${w.wrong} ${plural(w.wrong, 'błąd', 'błędy', 'błędów')}</span>` : ''}${tags.slice(0, 3).map((t) => `<span class="tag">${esc(t.name)}</span>`).join('')}${tags.length > 3 ? `<span class="tag">+${tags.length - 3}</span>` : ''}</div>
       </div>
       ${v.selecting ? '' : `<div class="word-actions">
-        <button type="button" class="btn-icon" data-edit aria-label="Edytuj ${esc(w.en)}" title="Edytuj">${icon('edit', 18)}</button>
-        <button type="button" class="btn-icon danger" data-del aria-label="Usuń ${esc(w.en)}" title="Usuń">${icon('trash', 18)}</button>
+        <button type="button" class="btn-icon" data-edit aria-label="Edytuj ${esc(w.term)}" title="Edytuj">${icon('edit', 18)}</button>
+        <button type="button" class="btn-icon danger" data-del aria-label="Usuń ${esc(w.term)}" title="Usuń">${icon('trash', 18)}</button>
       </div>`}
     </li>`;
   }
@@ -247,14 +253,15 @@ export function mount(el) {
 
   $('#addForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const en = aEn.value.trim(), pl = aPl.value.trim();
-    if (!en || !pl) {
+    const term = aEn.value.trim(), pl = aPl.value.trim();
+    if (!term || !pl) {
       toast('Wpisz słówko i jego tłumaczenie.', 'error');
-      (en ? aPl : aEn).focus();
+      (term ? aPl : aEn).focus();
       return;
     }
-    const r = await store.addWord({ en, pl, listIds: v.addList ? [v.addList] : [] });
-    if (r.status === 'added') toast(`Dodano: ${en} — ${pl}`, 'success');
+    const r = await store.addWord({ term, pl, listIds: v.addList ? [v.addList] : [] });
+    if (r.status === 'added') toast(`Dodano: ${term} — ${pl}`, 'success');
+    else if (r.status === 'limit') toast('Osiągnięto limit 10 000 słówek na konto.', 'error');
     else if (r.status === 'linked') toast('To słówko już było w bazie. Dodano je do wybranej listy.', 'info');
     else toast('Takie słówko już jest w bazie.', 'info');
     aEn.value = ''; aPl.value = '';
@@ -280,7 +287,7 @@ export function mount(el) {
     if (e.target.closest('[data-edit]')) return editWord(id);
     if (e.target.closest('[data-del]')) {
       const w = store.state.words.find((x) => x.id === id);
-      if (w && await confirmDialog({ title: 'Usunąć słówko?', text: `„${w.en} — ${w.pl}” zniknie z bazy i ze wszystkich list.`, confirmLabel: 'Usuń', danger: true })) {
+      if (w && await confirmDialog({ title: 'Usunąć słówko?', text: `„${w.term} — ${w.pl}” zniknie z bazy i ze wszystkich list.`, confirmLabel: 'Usuń', danger: true })) {
         await store.deleteWords([id]);
         toast('Słówko usunięte.', 'success');
       }
@@ -380,14 +387,14 @@ export function mount(el) {
     openModal({
       title: 'Edytuj słówko',
       html: `<form data-form autocomplete="off">
-        <div class="field"><label for="eEn">Angielski</label>
-          <div class="input-wrap"><input id="eEn" class="input" type="text" value="${esc(w.en)}" lang="en" spellcheck="false">${speakBtn(w.en)}</div></div>
+        <div class="field"><label for="eEn">${esc(L.name)}</label>
+          <div class="input-wrap"><input id="eEn" class="input" type="text" value="${esc(w.term)}" lang="${LANG}" spellcheck="false">${speakBtn(w.term)}</div></div>
         <div class="field"><label for="ePl">Polski</label><input id="ePl" class="input" type="text" value="${esc(w.pl)}" lang="pl"></div>
         <div class="sugg" id="eSugg"></div>
         ${lists.length ? `<div class="field"><label>Listy</label><div class="checks">${lists.map((l) => `<label class="check"><input type="checkbox" value="${esc(l.id)}" ${(w.listIds || []).includes(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('')}</div></div>` : ''}
         <div class="form-error" role="alert"></div></form>`,
       onMount: (api) => {
-        attachSuggest(api.el.querySelector('#eEn'), api.el.querySelector('#ePl'), api.el.querySelector('#eSugg'));
+        attachSuggest(api.el.querySelector('#eEn'), api.el.querySelector('#ePl'), api.el.querySelector('#eSugg'), LANG);
         api.el.querySelector('form').addEventListener('submit', (ev) => { ev.preventDefault(); api.el.querySelector('.btn-primary').click(); });
       },
       actions: [
@@ -395,10 +402,10 @@ export function mount(el) {
         {
           label: 'Zapisz', kind: 'primary',
           onClick: async (api) => {
-            const en = api.el.querySelector('#eEn').value.trim(), pl = api.el.querySelector('#ePl').value.trim();
-            if (!en || !pl) { api.el.querySelector('.form-error').textContent = 'Oba pola są wymagane.'; return false; }
+            const term = api.el.querySelector('#eEn').value.trim(), pl = api.el.querySelector('#ePl').value.trim();
+            if (!term || !pl) { api.el.querySelector('.form-error').textContent = 'Oba pola są wymagane.'; return false; }
             const listIds = [...api.el.querySelectorAll('.checks input:checked')].map((c) => c.value);
-            await store.updateWord(id, { en, pl, listIds });
+            await store.updateWord(id, { term, pl, listIds });
             toast('Zapisano zmiany.', 'success');
           },
         },
@@ -409,10 +416,12 @@ export function mount(el) {
   /* ---------- import / eksport CSV ---------- */
   async function handleFile(file) {
     if (!file) return;
+    if (file.size > MAX_FILE_BYTES) return toast(`Plik jest za duży (limit ${Math.round(MAX_FILE_BYTES / 1000)} KB).`, 'error', 6000);
     let text;
     try { text = await readText(file); } catch { return toast('Nie udało się odczytać pliku.', 'error'); }
-    const { words, skipped } = parseWords(text);
-    if (!words.length) return toast('Nie znaleziono słówek. Plik powinien mieć dwie kolumny: english,polish.', 'error', 6500);
+    let { words, skipped } = parseWords(text);
+    if (words.length > MAX_IMPORT_ROWS) { skipped += words.length - MAX_IMPORT_ROWS; words = words.slice(0, MAX_IMPORT_ROWS); toast(`Wczytano tylko pierwsze ${MAX_IMPORT_ROWS} wierszy (limit jednego importu).`, 'info', 6000); }
+    if (!words.length) return toast('Nie znaleziono słówek. Plik powinien mieć dwie kolumny: term,polish (słówko i tłumaczenie).', 'error', 6500);
 
     const known = new Set(store.state.words.map(wkey));
     const dupes = words.filter((w) => known.has(wkey(w))).length;
@@ -425,7 +434,7 @@ export function mount(el) {
       html: `<p class="modal-text">Znaleziono <strong>${words.length}</strong> ${plural(words.length, 'słówko', 'słówka', 'słówek')} w pliku <em>${esc(file.name)}</em>.
           ${dupes ? `<br><span class="muted">${dupes} już masz w bazie. Nie zostaną zdublowane, najwyżej trafią do wybranej listy.</span>` : ''}
           ${skipped ? `<br><span class="muted">Pominięto ${skipped} ${plural(skipped, 'wiersz', 'wiersze', 'wierszy')} (puste lub niepełne).</span>` : ''}</p>
-        <table class="preview"><thead><tr><th>Angielski</th><th>Polski</th></tr></thead><tbody>${preview.map((w) => `<tr><td>${esc(w.en)}</td><td>${esc(w.pl)}</td></tr>`).join('')}</tbody></table>
+        <table class="preview"><thead><tr><th>${esc(L.name)}</th><th>Polski</th></tr></thead><tbody>${preview.map((w) => `<tr><td>${esc(w.term)}</td><td>${esc(w.pl)}</td></tr>`).join('')}</tbody></table>
         ${words.length > preview.length ? `<p class="muted small">…i ${words.length - preview.length} więcej</p>` : ''}
         <div class="field"><label for="im-sel">Dodaj do listy</label>
           <select id="im-sel" class="select"><option value="__new__">＋ Nowa lista</option>${lists.map((l) => `<option value="${esc(l.id)}" ${l.id === v.listId ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}<option value="">Bez listy (tylko do bazy)</option></select></div>
@@ -454,7 +463,7 @@ export function mount(el) {
             if (r.listId) { v.listId = r.listId; v.addList = r.listId; }
             listsKey = '';
             renderAll();
-            toast(`Dodano ${r.added} ${plural(r.added, 'nowe słówko', 'nowe słówka', 'nowych słówek')}${r.linked ? `, ${r.linked} dopisano do listy` : ''}${r.duplicates ? `, ${r.duplicates} pominięto jako duplikaty` : ''}.`, 'success', 5000);
+            toast(`Dodano ${r.added} ${plural(r.added, 'nowe słówko', 'nowe słówka', 'nowych słówek')}${r.linked ? `, ${r.linked} dopisano do listy` : ''}${r.duplicates ? `, ${r.duplicates} pominięto jako duplikaty` : ''}${r.capped ? `. Limit bazy to ${MAX_WORDS_TXT} słówek, ${r.capped} pominięto` : ''}.`, 'success', 5000);
           },
         },
       ],
@@ -467,10 +476,26 @@ export function mount(el) {
     e.target.value = '';
     handleFile(f);
   });
+  $('#btnPacks').addEventListener('click', () => {
+    const packs = packsFor(LANG);
+    openModal({
+      title: `Gotowe zestawy: ${L.name}`,
+      html: `<p class="muted small">Zestaw trafia na nową listę. Słówka, które już masz, nie są dublowane.</p><div class="lang-list">${packs.map((p) => `<button type="button" class="lang-row" data-pack="${p.id}"><span class="lang-name">${esc(p.name)}</span><span class="muted small">${p.words.length} słówek</span></button>`).join('')}</div>`,
+      onMount: (api) => api.el.addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-pack]');
+        if (!b) return;
+        const p = packs.find((x) => x.id === b.dataset.pack);
+        api.close();
+        const r = await store.importWords(p.words, { newListName: store.listNameTaken(p.name) ? `${p.name} (${L.short})` : p.name });
+        toast(`Dodano ${r.added} słówek do listy „${p.name}”.`, 'success');
+      }),
+    });
+  });
+
   $('#btnExport').addEventListener('click', () => {
     const pool = store.poolFor(v.listId);
     if (!pool.length) return toast('Brak słówek do wyeksportowania.', 'info');
-    downloadFile(slug(store.listLabel(v.listId)) + '.csv', toCSV(pool), 'text/csv');
+    downloadFile(slug(store.listLabel(v.listId)) + '-' + LANG + '.csv', toCSV(pool), 'text/csv');
   });
 
   // Przeciągnij i upuść plik CSV na stronę.

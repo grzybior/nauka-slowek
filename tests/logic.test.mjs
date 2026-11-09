@@ -7,17 +7,17 @@ const U = await import(R + 'util.js');
 // --- CSV
 let r = parseWords('english,polish\nhouse,dom\n"to run, jog",biegać\nsay "hi",cześć\nempty,\n');
 assert.equal(r.words.length, 3); assert.equal(r.skipped, 1);
-assert.equal(r.words[1].en, 'to run, jog');
+assert.equal(r.words[1].term, 'to run, jog');
 r = parseWords('english;polish\r\ncat;kot\r\ndog;pies');
-assert.deepEqual(r.words, [{en:'cat',pl:'kot'},{en:'dog',pl:'pies'}]);
+assert.deepEqual(r.words, [{term:'cat',pl:'kot'},{term:'dog',pl:'pies'}]);
 r = parseWords('﻿angielski,polski\nrun,biegać, uciekać\n');
-assert.deepEqual(r.words, [{en:'run', pl:'biegać, uciekać'}]);
+assert.deepEqual(r.words, [{term:'run', pl:'biegać, uciekać'}]);
 r = parseWords('apple,jabłko\npear,gruszka');           // bez nagłówka
 assert.equal(r.words.length, 2);
 r = parseWords('"say ""hi""","cześć, hej"\n');
-assert.deepEqual(r.words, [{en:'say "hi"', pl:'cześć, hej'}]);
-const back = parseWords(toCSV([{en:'a, b', pl:'c "d"'},{en:'x', pl:'y'}]));
-assert.deepEqual(back.words, [{en:'a, b', pl:'c "d"'},{en:'x', pl:'y'}]);
+assert.deepEqual(r.words, [{term:'say "hi"', pl:'cześć, hej'}]);
+const back = parseWords(toCSV([{term:'a, b', pl:'c "d"'},{term:'x', pl:'y'}]));
+assert.deepEqual(back.words, [{term:'a, b', pl:'c "d"'},{term:'x', pl:'y'}]);
 assert.deepEqual(parseWords('').words, []);
 
 // --- normalizacja / odpowiedzi
@@ -29,7 +29,7 @@ assert.ok(!Q.isCorrect(q, '')); assert.ok(!Q.isCorrect(q, 'kot'));
 assert.ok(!Q.isCorrect({correct:'łąka'}, 'laka', true));
 
 // --- brak powtórzeń
-const words = Array.from({length: 12}, (_, i) => ({id:'w'+i, en:'en'+i, pl:'pl'+i}));
+const words = Array.from({length: 12}, (_, i) => ({id:'w'+i, term:'en'+i, pl:'pl'+i}));
 for (let k = 0; k < 200; k++) {
   const quiz = Q.buildStandardQuiz(words, 'all', 'both');
   assert.equal(quiz.length, 12);
@@ -43,14 +43,14 @@ const one = Q.createSource(words.slice(0,1)); one.next(); one.next();   // jedno
 assert.throws(() => Q.createSource([]).next());
 
 // --- odpowiedzi do wyboru
-const qq = Q.makeQuestion({id:'x', en:"don't", pl:"nie rób / nie"}, 'enpl');
+const qq = Q.makeQuestion({id:'x', term:"don't", pl:"nie rób / nie"}, 'enpl');
 const ch = Q.buildChoices(qq, words, words);
 assert.equal(ch.length, 4); assert.ok(ch.includes(qq.correct)); assert.equal(new Set(ch).size, 4);
 const few = Q.buildChoices(Q.makeQuestion(words[0],'enpl'), words.slice(0,2), words);
 assert.equal(few.length, 4);
 const tiny = Q.buildChoices(Q.makeQuestion(words[0],'enpl'), words.slice(0,2), []);
 assert.equal(tiny.length, 2);
-const dup = [{id:'a',en:'a',pl:'dom'},{id:'b',en:'b',pl:'dom'},{id:'c',en:'c',pl:'kot'}];
+const dup = [{id:'a',term:'a',pl:'dom'},{id:'b',term:'b',pl:'dom'},{id:'c',term:'c',pl:'kot'}];
 assert.equal(Q.buildChoices(Q.makeQuestion(dup[0],'enpl'), dup, dup).length, 2);   // 'dom' nie jest błędną opcją dla 'dom'
 
 // --- SRS
@@ -90,4 +90,21 @@ assert.equal(Q.pickKind(undefined, true, 0.5), 'choice');                 // bra
   assert.ok(Math.abs(freq({ box: 0 }) - 0.1) < 0.03, 'box 0 ~10% pisania');
   assert.ok(Math.abs(freq({ box: 4 }) - 0.85) < 0.03, 'box 4 ~85% pisania');
 }
+// --- wiele języków: normalizacja i CSV
+assert.equal(U.normalize('¿Dónde está?'), 'donde esta');
+assert.equal(U.normalize('Straße'), 'strasse');
+assert.equal(U.normalize('Straße', true), 'straße');
+assert.equal(U.normalize("L'été"), "l'ete");
+assert.equal(U.normalize('cœur'), 'coeur');
+assert.ok(Q.isCorrect({ correct: 'el niño' }, 'el nino'));
+assert.ok(!Q.isCorrect({ correct: 'el niño' }, 'el nino', true));
+assert.deepEqual(parseWords('spanish,polish\ncasa,dom').words, [{ term: 'casa', pl: 'dom' }]);
+assert.deepEqual(parseWords('Deutsch;polnisch\nHaus;dom').words, [{ term: 'Deutsch', pl: 'polnisch' }, { term: 'Haus', pl: 'dom' }].slice(0, 2)); // brak nagłówka rozpoznanego = wiersze danych
+assert.equal(toCSV([{ term: 'a', pl: 'b' }]).split('\n')[0], 'term,polish');
+const L = await import(R + 'languages.js');
+assert.equal(L.speechLocale('es', 'mx'), 'es-MX'); assert.equal(L.speechLocale('de'), 'de-DE');
+assert.equal(L.speechLocale('xx'), 'en-US'); assert.equal(L.dirLabel('plen', 'es'), 'PL → ES');
+const S = await import(R + 'starter.js');
+for (const c of L.LANG_CODES) assert.equal(S.starterWords(c).length, 30);
+assert.equal(L.speechLocale('sv'), 'sv-SE');
 console.log('OK: wszystkie testy logiki przeszły');

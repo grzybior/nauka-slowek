@@ -48,9 +48,9 @@ export function applyResult(w, ok, now = Date.now()) {
 export function makeQuestion(w, direction) {
   const dir = direction === 'both' ? (Math.random() < 0.5 ? 'enpl' : 'plen') : direction;
   return {
-    id: w.id, en: w.en, pl: w.pl, dir,
-    q: dir === 'enpl' ? w.en : w.pl,
-    correct: dir === 'enpl' ? w.pl : w.en,
+    id: w.id, term: w.term, pl: w.pl, dir, // dir: 'enpl' = język obcy → polski, 'plen' = polski → język obcy
+    q: dir === 'enpl' ? w.term : w.pl,
+    correct: dir === 'enpl' ? w.pl : w.term,
   };
 }
 
@@ -88,7 +88,7 @@ export function buildStandardQuiz(words, count, direction) {
 
 /** Odpowiedzi do wyboru: poprawna + błędne z tej samej puli (a gdy za mało – z całej bazy). */
 export function buildChoices(q, primary, fallback = [], n = 4) {
-  const key = q.dir === 'enpl' ? 'pl' : 'en';
+  const key = q.dir === 'enpl' ? 'pl' : 'term';
   const bad = new Set([normalize(q.correct)]);
   splitMeanings(q.correct).forEach((m) => bad.add(normalize(m)));
 

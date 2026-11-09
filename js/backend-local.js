@@ -26,7 +26,9 @@ export async function createBackend() {
   const cache = {};
 
   const users = () => read('users', {});
-  const pub = (email, u) => ({ uid: u.uid, email, name: u.name || '' });
+  const pub = (email, u) => ({ uid: u.uid, email, name: u.name || '', emailVerified: true });
+  const glob = () => (cache.__g ??= read('global', {}));
+  const saveGlob = () => write('global', glob());
   const db = (u) => (cache[u] ??= read('data_' + u, {}));
   const save = (u) => {
     try { write('data_' + u, cache[u]); } catch (e) { onWriteError?.(e); }
@@ -70,8 +72,10 @@ export async function createBackend() {
       const us = users();
       if (us[email]) throw new Error('Konto z tym adresem już istnieje.');
       const salt = rid();
+      const first = !Object.keys(us).length;
       us[email] = { uid: rid(), name: name || '', salt, hash: await hashPw(password, salt) };
       write('users', us);
+      if (first) { (glob().admins ??= {})[us[email].uid] = { demo: true }; saveGlob(); } // w demo pierwszy użytkownik jest administratorem
       write('session', email);
       current = pub(email, us[email]);
       authCb(current);
@@ -85,6 +89,33 @@ export async function createBackend() {
       current = pub(email, u);
       authCb(current);
       return current;
+    },
+    async sendVerification() { /* w trybie demo konto nie wymaga potwierdzenia */ },
+    async refreshUser() { return current; },
+
+    // Dokumenty globalne (profiles/config/admins/messages) oraz users/{uid}/{coll}/{id} w tym samym stylu co Firestore.
+    async getDocAt(path) {
+      const [a, b, c, d] = path.split('/');
+      const v = a === 'users' ? db(b)[c]?.[d] : glob()[a]?.[b];
+      return v ? { id: d || b, ...structuredClone(v) } : null;
+    },
+    async setDocAt(path, data, { merge = true } = {}) {
+      const [a, b, c, d] = path.split('/');
+      if (a === 'users') { (db(b)[c] ??= {})[d] = { ...(merge ? db(b)[c][d] : {}), ...structuredClone(data) }; save(b); return; }
+      const g = glob();
+      (g[a] ??= {})[b] = { ...(merge ? g[a][b] : {}), ...structuredClone(data) };
+      saveGlob();
+    },
+    async deleteAt(path) {
+      const [a, b, c, d] = path.split('/');
+      if (a === 'users') { delete db(b)[c]?.[d]; save(b); notify(b, c); return; }
+      delete glob()[a]?.[b];
+      saveGlob();
+    },
+    async listAt(path, { limit = 500 } = {}) {
+      const [a, b, c] = path.split('/');
+      const src = a === 'users' ? db(b)[c] : glob()[a];
+      return Object.entries(src || {}).slice(0, limit).map(([id, d]) => ({ id, ...structuredClone(d) }));
     },
     async signOut() {
       write('session', null);

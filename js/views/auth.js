@@ -12,9 +12,9 @@ export function mount(el) {
   el.innerHTML = `
   <div class="auth">
     <div class="auth-hero">
-      <div class="brand big"><span class="brand-mark">🧠</span><span>Nauka słówek</span></div>
-      <h1>Ucz się słówek <em>mądrzej</em>.</h1>
-      <p class="lead">Własna baza słówek, wymowa native speakerów, podpowiedzi tłumaczeń i automatyczne powtórki dokładnie wtedy, gdy ich potrzebujesz.</p>
+      <div class="brand big"><span class="brand-mark">🐦</span><span>Słowik</span></div>
+      <h1>Ucz się języków <em>mądrzej</em>.</h1>
+      <p class="lead">Angielski, hiszpański, niemiecki, francuski, włoski i szwedzki w jednej aplikacji: własna baza słówek, wymowa w każdym języku, podpowiedzi tłumaczeń i automatyczne powtórki dokładnie wtedy, gdy ich potrzebujesz.</p>
       <ul class="points">
         <li>${icon('volume', 18)}<span>Posłuchaj poprawnej wymowy każdego słówka</span></li>
         <li>${icon('repeat', 18)}<span>Powtórki rozłożone w czasie, bez zgadywania co powtarzać</span></li>
@@ -61,6 +61,15 @@ export function mount(el) {
   bindSegs(el, (_, v) => { mode = v; syncMode(); });
   syncMode();
 
+  // Rejestracja może być wyłączona przez administratora (ustawienie publiczne).
+  store.publicConfig().then((cfg) => {
+    if (cfg.registrationOpen !== false || !el.isConnected) return;
+    const reg = el.querySelector('[data-seg="authMode"] [data-v="register"]');
+    if (reg) reg.hidden = true;
+    mode = 'login'; syncMode();
+    $('.auth-card').insertAdjacentHTML('afterbegin', '<div class="notice warn">Rejestracja nowych kont jest chwilowo wyłączona.</div>');
+  });
+
   $('#togglePass').addEventListener('click', () => {
     const p = $('#aPass');
     const show = p.type === 'password';
@@ -100,5 +109,6 @@ export function mount(el) {
     } catch (ex) { err(ex.message); }
   });
 
+  el.querySelector('.auth').insertAdjacentHTML('beforeend', '<footer class="site-foot">Stworzone przez Grzegorz Ścibior</footer>');
   return { destroy() {} };
 }

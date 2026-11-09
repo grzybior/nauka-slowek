@@ -58,7 +58,9 @@ export async function createBackend(config) {
   const guard = (p) => p.catch((e) => onWriteError?.(e));
   const col = (uid, coll) => fs.collection(db, 'users', uid, coll);
   const ref = (uid, coll, id) => fs.doc(db, 'users', uid, coll, id);
-  const toUser = (u) => ({ uid: u.uid, email: u.email || '', name: u.displayName || '' });
+  const toUser = (u) => ({ uid: u.uid, email: u.email || '', name: u.displayName || '', emailVerified: Boolean(u.emailVerified) });
+  const docAt = (path) => fs.doc(db, ...path.split('/'));
+  const colAt = (path) => fs.collection(db, ...path.split('/'));
 
   return {
     mode: 'firebase',
@@ -70,6 +72,7 @@ export async function createBackend(config) {
       try {
         const cred = await authM.createUserWithEmailAndPassword(auth, email.trim(), password);
         if (name) await authM.updateProfile(cred.user, { displayName: name });
+        try { await authM.sendEmailVerification(cred.user); } catch { /* można wysłać ponownie z ekranu weryfikacji */ }
         return toUser(cred.user);
       } catch (e) { throw friendly(e); }
     },
@@ -80,6 +83,24 @@ export async function createBackend(config) {
       } catch (e) { throw friendly(e); }
     },
     signOut() { return authM.signOut(auth); },
+    async sendVerification() {
+      try { await authM.sendEmailVerification(auth.currentUser); } catch (e) { throw friendly(e); }
+    },
+    /** Pobiera świeży stan konta (po kliknięciu linku w mailu) i odświeża token, bo reguły sprawdzają email_verified. */
+    async refreshUser() {
+      await auth.currentUser.reload();
+      await auth.currentUser.getIdToken(true);
+      return toUser(auth.currentUser);
+    },
+
+    // Dokumenty spoza users/{uid}: profile, config, admins, messages. Ścieżka np. 'profiles/abc'.
+    async getDocAt(path) { const s = await fs.getDoc(docAt(path)); return s.exists() ? { id: s.id, ...s.data() } : null; },
+    async setDocAt(path, data, { merge = true } = {}) { await fs.setDoc(docAt(path), data, { merge }); },
+    async deleteAt(path) { await fs.deleteDoc(docAt(path)); },
+    async listAt(path, { limit = 500 } = {}) {
+      const s = await fs.getDocs(fs.query(colAt(path), fs.limit(limit)));
+      return s.docs.map((d) => ({ id: d.id, ...d.data() }));
+    },
     async resetPassword(email) {
       try { await authM.sendPasswordResetEmail(auth, email.trim()); } catch (e) { throw friendly(e); }
     },

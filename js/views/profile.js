@@ -2,7 +2,8 @@
 import { esc, downloadFile } from '../util.js';
 import { icon, seg, bindSegs, toast, confirmDialog } from '../ui.js';
 import { toCSV } from '../csv.js';
-import { canSpeak } from '../speech.js';
+import { canSpeak, hasVoice } from '../speech.js';
+import { LANGS } from '../languages.js';
 import * as store from '../store.js';
 
 export function mount(el) {
@@ -43,19 +44,23 @@ export function mount(el) {
       <div class="card">
         <h2>${icon('sparkles', 20)} Ustawienia nauki</h2>
         <div class="field"><label>Motyw</label>${seg('theme', [['auto', 'Auto'], ['light', 'Jasny'], ['dark', 'Ciemny']], p.theme)}</div>
-        ${canSpeak ? `<div class="field"><label>Akcent wymowy</label>
-          <div class="row">${seg('accent', [['us', 'Amerykański'], ['gb', 'Brytyjski']], p.accent)}
-          <button type="button" class="btn btn-ghost btn-sm" data-say="Hello, nice to meet you." data-test>${icon('volume', 16)} Posłuchaj</button></div></div>` : ''}
+        ${canSpeak ? `<div class="field"><label>Wymowa</label>${s.langs.map((c) => {
+          const L = LANGS[c];
+          const choices = L.accents.length > 1 ? seg('accent:' + c, L.accents.map((a) => [a[0], a[1]]), store.accentFor(c)) : '';
+          return `<div class="row accent-row"><span class="lang-badge">${L.short}</span><span class="accent-name">${esc(L.name)}</span>${choices}
+            <button type="button" class="btn btn-ghost btn-sm" data-say="${esc(L.sample)}" data-lang="${c}" data-accent="${store.accentFor(c)}" data-test>${icon('volume', 16)} Posłuchaj</button>
+            ${hasVoice(c) ? '' : '<span class="muted small">Brak głosu na tym urządzeniu</span>'}</div>`;
+        }).join('')}</div>` : ''}
         <label class="switch"><input type="checkbox" id="swSpeak" ${p.autoSpeak ? 'checked' : ''} ${canSpeak ? '' : 'disabled'}><span class="track"></span><span>Odtwarzaj wymowę automatycznie w quizie</span></label>
         <label class="switch"><input type="checkbox" id="swSound" ${p.sounds ? 'checked' : ''}><span class="track"></span><span>Dźwięki poprawnej i błędnej odpowiedzi</span></label>
-        <label class="switch"><input type="checkbox" id="swStrict" ${p.strict ? 'checked' : ''}><span class="track"></span><span>Wymagaj polskich znaków w pisowni (ą, ę, ł…)</span></label>
+        <label class="switch"><input type="checkbox" id="swStrict" ${p.strict ? 'checked' : ''}><span class="track"></span><span>Wymagaj znaków diakrytycznych w pisowni (ą, ł, ñ, ü, é…)</span></label>
         <div class="field"><label for="pDelay">Przerwa po odpowiedzi (sekundy, 0 = przechodzę ręcznie)</label>
           <input id="pDelay" class="input narrow" type="number" min="0" max="10" step="0.5" value="${p.delay}"></div>
       </div>
 
       <div class="card">
         <h2>${icon('download', 20)} Twoje dane</h2>
-        <p class="muted">Pobierz wszystkie swoje słówka jako plik CSV. Możesz go później zaimportować z powrotem.</p>
+        <p class="muted">Pobierz słówka z bieżącego języka jako plik CSV. Możesz go później zaimportować z powrotem.</p>
         <div class="row">
           <button class="btn btn-ghost" id="btnExport">${icon('download', 18)} Pobierz słówka (CSV)</button>
           <button class="btn btn-danger-ghost" id="btnOut">${icon('logout', 18)} Wyloguj się</button>
@@ -95,7 +100,14 @@ export function mount(el) {
     } catch (ex) { err(ex.message); } finally { btn.disabled = false; }
   });
 
-  bindSegs(el, (name, v) => store.savePrefs({ [name]: v }));
+  bindSegs(el, (name, v) => {
+    if (name.startsWith('accent:')) {
+      const c = name.slice(7);
+      store.setAccent(c, v);
+      const t = el.querySelector(`[data-test][data-lang="${c}"]`);
+      if (t) t.dataset.accent = v;
+    } else store.savePrefs({ [name]: v });
+  });
   $('#swSpeak').addEventListener('change', (e) => store.savePrefs({ autoSpeak: e.target.checked }));
   $('#swSound').addEventListener('change', (e) => store.savePrefs({ sounds: e.target.checked }));
   $('#swStrict').addEventListener('change', (e) => store.savePrefs({ strict: e.target.checked }));
@@ -108,7 +120,7 @@ export function mount(el) {
 
   $('#btnExport').addEventListener('click', () => {
     if (!store.state.words.length) return toast('Nie masz jeszcze żadnych słówek.', 'info');
-    downloadFile('moje-slowka.csv', toCSV(store.state.words), 'text/csv');
+    downloadFile('moje-slowka-' + store.state.lang + '.csv', toCSV(store.state.words), 'text/csv');
   });
   $('#btnOut').addEventListener('click', async () => {
     if (await confirmDialog({ title: 'Wylogować się?', text: 'Twoje dane zostają na koncie i będą czekać po ponownym zalogowaniu.', confirmLabel: 'Wyloguj' })) store.signOut();

@@ -2,6 +2,8 @@
 import * as store from './store.js';
 import { loadBackend } from './backend.js';
 import { speak } from './speech.js';
+import { openLangMenu } from './langmenu.js';
+import { langInfo } from './languages.js';
 import { esc } from './util.js';
 import { icon, toast } from './ui.js';
 import * as homeView from './views/home.js';
@@ -10,6 +12,8 @@ import * as wordsView from './views/words.js';
 import * as historyView from './views/history.js';
 import * as profileView from './views/profile.js';
 import * as authView from './views/auth.js';
+import * as contactView from './views/contact.js';
+import * as adminView from './views/admin.js';
 
 const root = document.getElementById('app');
 
@@ -26,10 +30,13 @@ const ROUTES = [
   { re: /^\/words$/, view: wordsView, nav: 'words' },
   { re: /^\/history(?:\/([^/]+))?$/, view: historyView, nav: 'history' },
   { re: /^\/profile$/, view: profileView, nav: 'profile' },
+  { re: /^\/contact$/, view: contactView, nav: 'profile' },
+  { re: /^\/admin$/, view: adminView, nav: 'profile' },
 ];
 
 let shown = '';      // co jest teraz na ekranie: splash | auth | error | shell
 let current = null;  // instancja aktualnego widoku
+let shownLang = '';  // język, dla którego narysowano widok
 
 /* ---------- motyw ---------- */
 function applyTheme(t) {
@@ -46,7 +53,7 @@ function destroyView() {
 }
 
 function paintSplash() {
-  root.innerHTML = `<div class="splash"><div class="brand big"><span class="brand-mark">🧠</span><span>Nauka słówek</span></div><div class="spinner" role="status" aria-label="Ładowanie"></div></div>`;
+  root.innerHTML = `<div class="splash"><div class="brand big"><span class="brand-mark">🐦</span><span>Słowik</span></div><div class="spinner" role="status" aria-label="Ładowanie"></div></div>`;
 }
 
 function paintError(message) {
@@ -56,6 +63,44 @@ function paintError(message) {
     ${store.state.user ? '<button class="btn btn-ghost" id="btnOut">Wyloguj</button>' : ''}</div></div></div>`;
   root.querySelector('#btnRetry').addEventListener('click', () => location.reload());
   root.querySelector('#btnOut')?.addEventListener('click', () => store.signOut());
+}
+
+const footer = (admin = false) => `<footer class="site-foot">Stworzone przez Grzegorz Ścibior${store.state.status === 'ready' ? ' · <a href="#/contact">Kontakt</a>' : ''}${admin ? ' · <a href="#/admin">Panel administratora</a>' : ''}</footer>`;
+
+function paintVerify() {
+  const u = store.state.user;
+  root.innerHTML = `<div class="splash"><div class="card error-card">
+    <div class="brand big"><span class="brand-mark">🐦</span><span>Słowik</span></div>
+    <h2>Potwierdź swój e-mail</h2>
+    <p class="muted">Wysłaliśmy link na adres <strong>${esc(u?.email || '')}</strong>. Kliknij go, a potem wróć tutaj. Sprawdź też folder ze spamem.</p>
+    <div class="form-error" id="vMsg" role="status"></div>
+    <div class="row center"><button class="btn btn-primary" id="vCheck">Już kliknąłem(am)</button>
+    <button class="btn btn-ghost" id="vResend">Wyślij link ponownie</button>
+    <button class="btn btn-ghost" id="vOut">Wyloguj</button></div>${footer()}</div></div>`;
+  const msg = (m) => { root.querySelector('#vMsg').textContent = m; };
+  const check = async (quiet) => {
+    try { if (!(await store.recheckVerification()) && !quiet) msg('Jeszcze nie widzę potwierdzenia. Kliknij link w mailu i spróbuj ponownie.'); }
+    catch (e) { if (!quiet) msg(e.message); }
+  };
+  root.querySelector('#vCheck').addEventListener('click', () => check(false));
+  root.querySelector('#vResend').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try { await store.resendVerification(); msg('Wysłano ponownie.'); } catch (ex) { msg(ex.message); }
+    setTimeout(() => { e.target.disabled = false; }, 30000);
+  });
+  root.querySelector('#vOut').addEventListener('click', () => store.signOut());
+  const onFocus = () => { if (shown === 'verify') check(true); };
+  window.addEventListener('focus', onFocus);
+  current = { destroy() { window.removeEventListener('focus', onFocus); } };
+}
+
+function paintBlocked(reason) {
+  const closed = reason === 'closed';
+  root.innerHTML = `<div class="splash"><div class="card error-card">
+    <div class="empty-emoji">${closed ? '🚧' : '🔒'}</div><h2>${closed ? 'Rejestracja jest wyłączona' : 'Konto jest zablokowane'}</h2>
+    <p class="muted">${closed ? 'Nowe konta nie są teraz przyjmowane. Spróbuj później.' : 'Dostęp do tego konta został zablokowany przez administratora.'}</p>
+    <button class="btn btn-ghost" id="btnOut">Wyloguj</button>${footer()}</div></div>`;
+  root.querySelector('#btnOut').addEventListener('click', () => store.signOut());
 }
 
 function paintAuth() {
@@ -72,14 +117,26 @@ function paintShell() {
   root.innerHTML = `
   <div class="shell" id="shell">
     <header class="topbar">
-      <a class="brand" href="#/"><span class="brand-mark">🧠</span><span>Nauka słówek</span></a>
+      <a class="brand" href="#/"><span class="brand-mark">🐦</span><span>Słowik</span></a>
       <nav class="nav" aria-label="Główna nawigacja">${NAV.slice(0, 3).map(link).join('')}</nav>
+      <button type="button" class="lang-chip" id="langChip" aria-label="Zmień język nauki" title="Zmień język nauki"></button>
       <a class="avatar" href="#/profile" data-nav="profile" aria-label="Profil: ${esc(u.name || u.email)}" id="topAvatar">${esc(initialOf(u))}</a>
     </header>
     <main id="view" class="container" tabindex="-1"></main>
+    ${footer(store.state.isAdmin)}
     <nav class="tabbar" aria-label="Nawigacja">${NAV.map(tab).join('')}</nav>
   </div>`;
+  document.getElementById('langChip').addEventListener('click', openLangMenu);
+  paintLangChip();
+  shownLang = store.state.lang;
   route();
+}
+
+function paintLangChip() {
+  const b = document.getElementById('langChip');
+  if (!b) return;
+  const L = langInfo(store.state.lang);
+  b.innerHTML = `<span class="lang-badge">${L.short}</span><span class="lang-chip-name">${esc(L.name)}</span>`;
 }
 
 function route() {
@@ -112,7 +169,7 @@ function route() {
 /* ---------- reakcja na zmiany stanu ---------- */
 function onState(s) {
   applyTheme(s.prefs.theme);
-  const key = s.status === 'ready' ? 'shell' : s.status === 'out' ? 'auth' : s.status === 'error' ? 'error' : 'splash';
+  const key = s.status === 'ready' ? 'shell' : s.status === 'out' ? 'auth' : s.status === 'error' ? 'error' : s.status === 'verify' ? 'verify' : s.status === 'blocked' ? 'blocked' : 'splash';
   if (key !== shown) {
     destroyView();
     // Po wylogowaniu wracamy na ekran startowy, żeby kolejne logowanie nie lądowało np. na profilu.
@@ -121,12 +178,16 @@ function onState(s) {
     if (key === 'shell') paintShell();
     else if (key === 'auth') paintAuth();
     else if (key === 'error') paintError(s.error);
+    else if (key === 'verify') paintVerify();
+    else if (key === 'blocked') paintBlocked(s.blockReason);
     else paintSplash();
     return;
   }
   if (key === 'shell') {
     const av = document.getElementById('topAvatar');
     if (av) av.textContent = initialOf(s.user);
+    paintLangChip();
+    if (s.lang !== shownLang) { shownLang = s.lang; route(); return; } // zmiana języka = świeże widoki
     try { current?.update?.(); } catch (e) { console.error(e); }
   }
 }
@@ -139,7 +200,8 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   const text = b.dataset.say;
   if (!text) return;
-  speak(text, { accent: store.state.prefs.accent, slow: b.dataset.slow === '1' });
+  const lang = b.dataset.lang || store.state.lang;
+  speak(text, { lang, accent: b.dataset.accent || store.accentFor(lang), slow: b.dataset.slow === '1' });
   b.classList.add('pulse');
   setTimeout(() => b.classList.remove('pulse'), 700);
 });
@@ -148,6 +210,10 @@ window.addEventListener('hashchange', route);
 
 store.onError((e) => {
   console.error(e);
+  if (store.isQuotaError(e)) {
+    toast('Wyczerpany został dzienny limit darmowej bazy danych. Zmiany zostaną zapisane na urządzeniu i zsynchronizują się po odnowieniu limitu (zwykle jutro).', 'error', 9000);
+    return;
+  }
   const denied = e?.code === 'permission-denied';
   toast(denied ? 'Brak uprawnień do zapisu. Sprawdź reguły Firestore (README).' : 'Nie udało się zapisać zmian: ' + (e?.message || e), 'error', 6000);
 });

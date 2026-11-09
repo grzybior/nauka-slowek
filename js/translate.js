@@ -3,11 +3,12 @@
 
 const API = 'https://api.mymemory.translated.net/get';
 
-function matchCase(source, text) {
+function matchCase(source, text, to) {
   let t = text.trim().replace(/\s+/g, ' ');
   if (!/[.!?]$/.test(source)) t = t.replace(/[.!?]+$/, '');
   // Słowo wpisane małą literą -> podpowiedź też małą literą (np. "house" -> "dom", a nie "Dom").
-  if (source[0] === source[0].toLowerCase() && !/^[A-ZĄĆĘŁŃÓŚŹŻ]{2,}/.test(t)) {
+  // Wyjątek: rzeczowniki niemieckie piszemy wielką literą, więc dla języka docelowego 'de' nic nie zmieniamy.
+  if (to !== 'de' && source[0] === source[0].toLowerCase() && !/^[A-ZĄĆĘŁŃÓŚŹŻ]{2,}/.test(t)) {
     t = t.charAt(0).toLowerCase() + t.slice(1);
   }
   return t;
@@ -15,7 +16,7 @@ function matchCase(source, text) {
 
 /**
  * Zwraca do 4 propozycji tłumaczenia tekstu.
- * from/to: 'en' | 'pl'. Rzuca Error('quota') po wyczerpaniu limitu i Error('network') przy błędzie sieci.
+ * from/to: kody języków ('pl', 'en', 'es', 'de', 'fr', 'it'). Rzuca Error('quota') po wyczerpaniu limitu i Error('network') przy błędzie sieci.
  */
 export async function suggest(text, from, to, signal) {
   const q = text.trim();
@@ -38,7 +39,7 @@ export async function suggest(text, from, to, signal) {
   const seen = new Set([q.toLowerCase()]);
   const add = (t) => {
     if (typeof t !== 'string') return;
-    const v = matchCase(q, t);
+    const v = matchCase(q, t, to);
     const k = v.toLowerCase();
     if (!v || v.length > 80 || seen.has(k)) return;
     seen.add(k);

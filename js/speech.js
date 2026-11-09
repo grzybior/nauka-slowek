@@ -1,4 +1,5 @@
-// Odsłuchiwanie wymowy angielskich słówek (Web Speech API wbudowane w przeglądarkę, bez kluczy i opłat).
+// Odsłuchiwanie wymowy słówek w wybranym języku (Web Speech API wbudowane w przeglądarkę, bez kluczy i opłat).
+import { speechLocale, DEFAULT_LANG } from './languages.js';
 
 export const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
 
@@ -13,26 +14,37 @@ if (canSpeak) {
 
 const PREFERRED = /google|natural|premium|enhanced|samantha|daniel|serena|karen|alex/i;
 
-function pickVoice(lang) {
-  const want = lang.toLowerCase();
-  const norm = (v) => v.lang.replace('_', '-').toLowerCase();
+const norm = (v) => v.lang.replace('_', '-').toLowerCase();
+
+function pickVoice(locale) {
+  const want = locale.toLowerCase();
+  const prefix = want.split('-')[0];
   const exact = voices.filter((v) => norm(v) === want);
-  const pool = exact.length ? exact : voices.filter((v) => norm(v).startsWith('en'));
+  const pool = exact.length ? exact : voices.filter((v) => norm(v).split('-')[0] === prefix);
   return pool.find((v) => PREFERRED.test(v.name)) || pool[0] || null;
+}
+
+/** Czy urządzenie ma jakikolwiek głos dla danego języka (lista głosów bywa ładowana z opóźnieniem). */
+export function hasVoice(lang) {
+  if (!canSpeak) return false;
+  if (!voices.length) loadVoices();
+  if (!voices.length) return true; // jeszcze nie wiadomo, nie strasz ostrzeżeniem
+  const prefix = speechLocale(lang).split('-')[0];
+  return voices.some((v) => norm(v).split('-')[0] === prefix);
 }
 
 // Obietnica kończąca się, gdy bieżąca wymowa dobiegnie końca (albo zostanie przerwana).
 let current = Promise.resolve();
 
-/** accent: 'us' | 'gb'; slow: wolniejsze tempo. Rozpoczęcie nowej wymowy przerywa poprzednią. */
-export function speak(text, { accent = 'us', slow = false } = {}) {
+/** lang: kod języka, accent: wariant (np. 'us'/'gb'), slow: wolniejsze tempo. Nowa wymowa przerywa poprzednią. */
+export function speak(text, { lang = DEFAULT_LANG, accent, slow = false } = {}) {
   if (!canSpeak || !text) return;
-  const lang = accent === 'gb' ? 'en-GB' : 'en-US';
+  const locale = speechLocale(lang, accent);
   const synth = window.speechSynthesis;
   synth.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang;
-  const v = pickVoice(lang);
+  u.lang = locale;
+  const v = pickVoice(locale);
   if (v) u.voice = v;
   u.rate = slow ? 0.65 : 0.95;
 
