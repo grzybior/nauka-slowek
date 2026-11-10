@@ -12,6 +12,7 @@ Aplikacja do nauki słówek: angielski, hiszpański, niemiecki, francuski, włos
 - **Wymowa**: przycisk 🔊 (oraz wolniej 🐢) przy każdym słówku, w języku nauki (np. akcent amerykański/brytyjski, hiszpański z Hiszpanii/Ameryki Łacińskiej). Korzysta z syntezy mowy wbudowanej w przeglądarkę.
 - **Import i eksport CSV** (przecinek, średnik i tabulator; cudzysłowy; pliki z Excela w windows-1250), także przez przeciągnięcie pliku na stronę.
 - **Powtórki rozłożone w czasie** (system Leitnera): słówko poprawnie odpowiedziane wraca po 1, 2, 4, 8, 16 dniach, błędnie od razu. Zestaw „Na dziś” zbiera to, co czeka na powtórkę, a „Trudne słówka” to te, w których błędów jest więcej niż trafień.
+- **Fiszki**: spokojne poznawanie słówek (zestaw i liczba na ekranie głównym), przyciski Poprzednia/Następna, strzałki i przesuwanie palcem, opcja ukrycia tłumaczenia do odkrycia dotknięciem. Fiszki niczego nie zapisują, więc nie wpływają na powtórki ani quizy.
 - **Quiz**: wybór, pisanie albo **tryb mieszany** (rodzaj pytania zależy od tego, jak dobrze znasz słówko: nowe i trudne dostają głównie wybór, dobrze opanowane głównie pisanie; działa też w powtórce „Na dziś”), kierunek język→PL / PL→język / oba, tryb na liczbę pytań lub na czas, bez powtórzeń słówek w jednym quizie, skróty klawiaturowe (1–4, Enter). Po odpowiedzi PL→język obcy aplikacja czyta poprawne słowo i dopiero po skończeniu odczytu przechodzi do kolejnego pytania.
 - **Historia**: każda sesja z wynikiem, czasem i pełną listą odpowiedzi (błędy z Twoją odpowiedzią i poprawną), wykres skuteczności, najtrudniejsze słówka, przycisk „Ćwicz błędne”.
 - Jasny i ciemny motyw, układ dopasowany do telefonu (dolna nawigacja).
@@ -100,6 +101,7 @@ js/starter.js         gotowe zestawy słówek (podstawowy i tematyczne, 6 język
 js/limits.js          limity chroniące bazę
 js/views/admin.js     panel administratora
 js/views/contact.js   formularz kontaktowy
+js/views/cards.js     fiszki
 js/speech.js          wymowa (Web Speech API)
 js/translate.js       podpowiedzi tłumaczeń (MyMemory, darmowe, bez klucza)
 js/backend-firebase.js  logowanie i baza w Firebase

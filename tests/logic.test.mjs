@@ -107,4 +107,13 @@ assert.equal(L.speechLocale('xx'), 'en-US'); assert.equal(L.dirLabel('plen', 'es
 const S = await import(R + 'starter.js');
 for (const c of L.LANG_CODES) assert.equal(S.starterWords(c).length, 30);
 assert.equal(L.speechLocale('sv'), 'sv-SE');
+// --- pisanie zawsze PL -> język obcy
+{
+  const wd = { id: 'c', term: 'cap', pl: 'czapka' };
+  const qe = Q.makeQuestion(wd, 'enpl');
+  const fixed = Q.forKind(qe, wd, 'spelling');
+  assert.equal(fixed.dir, 'plen'); assert.equal(fixed.q, 'czapka'); assert.equal(fixed.correct, 'cap');
+  assert.equal(Q.forKind(qe, wd, 'choice'), qe);                       // wybór zachowuje kierunek
+  assert.equal(Q.forKind(Q.makeQuestion(wd, 'plen'), wd, 'spelling').dir, 'plen');
+}
 console.log('OK: wszystkie testy logiki przeszły');
