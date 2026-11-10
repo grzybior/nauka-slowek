@@ -3,7 +3,7 @@ import { esc, fmtTime, pct } from '../util.js';
 import { icon, speakBtn, toast, openModal } from '../ui.js';
 import { speak, stopSpeaking, whenSpoken } from '../speech.js';
 import { sOK, sBAD, sWIN, setSoundEnabled, unlockAudio } from '../sound.js';
-import { buildStandardQuiz, createSource, buildChoices, isCorrect, pickKind } from '../quiz.js';
+import { buildStandardQuiz, createSource, buildChoices, isCorrect, pickKind, forKind } from '../quiz.js';
 import { takeLaunch } from '../launch.js';
 import * as store from '../store.js';
 import { answerRows, scoreRing, scoreMessage, dirLabel } from './shared.js';
@@ -102,9 +102,12 @@ export function mount(el) {
     const cfg = run.cfg;
     run.q = cfg.mode === 'standard' ? run.questions[run.idx] : run.source.next();
     run.awaiting = false;
-    const q = run.q;
+    const q0 = run.q;
     // Rodzaj pytania: w trybie mieszanym zależy od opanowania słówka (nowe: wybór, znane: pisanie).
-    run.kind = cfg.type === 'mixed' ? pickKind(run.byId.get(q.id), run.all.length >= 2) : (cfg.type === 'spelling' ? 'spelling' : 'choice');
+    run.kind = cfg.type === 'mixed' ? pickKind(run.byId.get(q0.id), run.all.length >= 2) : (cfg.type === 'spelling' ? 'spelling' : 'choice');
+    // W trybie mieszanym pytania pisane idą zawsze PL → język obcy; w trybie Pisanie obowiązuje wybrany kierunek.
+    run.q = cfg.type === 'mixed' ? forKind(q0, run.byId.get(q0.id), run.kind) : q0;
+    const q = run.q;
     const spelling = run.kind === 'spelling';
     $q('#qAnswers').hidden = spelling;
     $q('#qForm').hidden = !spelling;
