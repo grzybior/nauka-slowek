@@ -448,3 +448,24 @@ textarea.input { resize: vertical; min-height: 120px; font: inherit; }
 .msg p { margin: 6px 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 760px) { .site-foot { padding-bottom: 96px; } }
 .shell.focus .site-foot { display: none; }
+
+/* fiszki */
+.fc { max-width: 640px; }
+.fc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.fc-count { font-weight: 800; font-variant-numeric: tabular-nums; }
+.fc-switch { padding: 0; font-size: 14px; }
+.fc-bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.fc-bar span { display: block; height: 100%; background: var(--grad); transition: width .25s; }
+.fc-card { min-height: 300px; align-content: center; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.fc-term { font-size: clamp(30px, 8vw, 46px); font-weight: 800; overflow-wrap: anywhere; }
+.fc-tools { display: flex; justify-content: center; gap: 8px; min-height: 44px; }
+.fc-pl { font-size: clamp(22px, 6vw, 30px); color: var(--primary); font-weight: 700; overflow-wrap: anywhere; }
+.fc-pl.hidden { font-size: 15px; font-weight: 500; color: var(--muted); }
+.fc-nav { display: flex; gap: 12px; }
+.fc-nav .btn { flex: 1; justify-content: center; }
+.fc-setup { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.fc-setup h2 { margin: 0 0 2px; }
+.fc-setup p { margin: 0; font-size: 14px; }
+.fc-setup-ctl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fc-setup-ctl .select { width: auto; min-width: 130px; }
+@media (max-width: 560px) { .fc-setup-ctl { width: 100%; } .fc-setup-ctl .select { flex: 1; } }
