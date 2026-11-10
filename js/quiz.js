@@ -55,6 +55,14 @@ export function makeQuestion(w, direction) {
 }
 
 /**
+ * Tryb mieszany: pytania pisane zawsze idą z polskiego na język obcy ("czapka" → wpisz "cap"); wpisywanie polskiego
+ * tłumaczenia obcego słowa nie ma sensu. Pytania z wyborem zachowują wylosowany kierunek.
+ */
+export function forKind(q, word, kind) {
+  return kind === 'spelling' && q.dir !== 'plen' && word ? makeQuestion(word, 'plen') : q;
+}
+
+/**
  * Źródło pytań: losuje z "worka" i dopiero po wyczerpaniu wszystkich słówek tasuje go od nowa,
  * więc słówka nie powtarzają się, dopóki nie przejdziemy całej puli.
  */
