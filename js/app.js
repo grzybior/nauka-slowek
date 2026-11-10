@@ -13,6 +13,7 @@ import * as historyView from './views/history.js';
 import * as profileView from './views/profile.js';
 import * as authView from './views/auth.js';
 import * as contactView from './views/contact.js';
+import * as cardsView from './views/cards.js';
 import * as adminView from './views/admin.js';
 
 const root = document.getElementById('app');
@@ -27,6 +28,7 @@ const NAV = [
 const ROUTES = [
   { re: /^\/?$/, view: homeView, nav: 'home' },
   { re: /^\/quiz$/, view: quizView, nav: 'home', focus: true },
+  { re: /^\/cards$/, view: cardsView, nav: 'home' },
   { re: /^\/words$/, view: wordsView, nav: 'words' },
   { re: /^\/history(?:\/([^/]+))?$/, view: historyView, nav: 'history' },
   { re: /^\/profile$/, view: profileView, nav: 'profile' },
