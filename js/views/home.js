@@ -2,16 +2,21 @@
 import { esc, plural, fmtDate, fmtTime } from '../util.js';
 import { icon, seg, bindSegs, toast, isTyping } from '../ui.js';
 import * as store from '../store.js';
-import { setLaunch, takePreselect } from '../launch.js';
+import { setLaunch, takePreselect, setCards } from '../launch.js';
 import { starterWords, STARTER_NAME } from '../starter.js';
 import { dirLabel, langInfo } from '../languages.js';
 import { parseDuration } from '../quiz.js';
 import { scoreRing, accuracyOf, MODE_LABEL, TYPE_LABEL } from './shared.js';
 
 const COUNTS = ['10', '20', '30', '50', 'all'];
+const CARD_COUNTS = ['5', '10', '20', 'all'];
+const CARDS_KEY = 'ns_cards';
+const loadCards = () => { try { return { listId: 'all', count: '10', ...JSON.parse(localStorage.getItem(CARDS_KEY) || '{}') }; } catch { return { listId: 'all', count: '10' }; } };
+const saveCards = (c) => { try { localStorage.setItem(CARDS_KEY, JSON.stringify(c)); } catch { /* ignore */ } };
 
 export function mount(el) {
   const draft = { ...store.state.prefs.quiz };
+  const cards = loadCards();
   const pre = takePreselect();
   if (pre) draft.listId = pre;
 
@@ -26,6 +31,7 @@ export function mount(el) {
     const name = s.user.name || s.user.email.split('@')[0];
     const lists = [...store.VIRTUAL_LISTS, ...s.lists];
     if (!lists.some((l) => l.id === draft.listId)) draft.listId = 'all';
+    if (!lists.some((l) => l.id === cards.listId)) cards.listId = 'all';
     const poolSize = store.poolFor(draft.listId).length;
     const recent = s.sessions.slice(0, 3);
 
@@ -63,6 +69,15 @@ export function mount(el) {
         <div><h2>Powtórka na dziś</h2><p>${st.due} ${plural(st.due, 'słówko', 'słówka', 'słówek')} gotowych do powtórzenia. Krótka sesja robi największą różnicę.</p></div>
         <button class="btn btn-light btn-lg" id="btnQuick">${icon('play', 18)} Zacznij powtórkę</button>
       </div>` : ''}
+
+      <form class="card fc-setup" id="cardsForm">
+        <div class="fc-setup-text"><h2>Fiszki</h2><p class="muted">Poznawaj słówka bez oceniania. Nie wpływają na powtórki ani quizy.</p></div>
+        <div class="fc-setup-ctl">
+          <select id="cList" class="select" aria-label="Zestaw fiszek">${lists.map((l) => `<option value="${esc(l.id)}" ${l.id === cards.listId ? 'selected' : ''}>${esc(l.name)} (${store.poolFor(l.id).length})</option>`).join('')}</select>
+          <select id="cCount" class="select" aria-label="Liczba fiszek">${CARD_COUNTS.map((c) => `<option value="${c}" ${c === String(cards.count) ? 'selected' : ''}>${c === 'all' ? 'Wszystkie' : c + ' fiszek'}</option>`).join('')}</select>
+          <button class="btn btn-ghost" type="submit">${icon('book', 18)} Ucz się</button>
+        </div>
+      </form>
 
       <form class="card setup" id="setup">
         <h2>Nowy quiz</h2>
@@ -122,6 +137,18 @@ export function mount(el) {
     el.querySelector('#btnQuick')?.addEventListener('click', () => {
       launch({ listId: 'due', listName: store.listLabel('due'), mode: 'standard', type: draft.type, direction: draft.direction, count: '20', seconds: 0 });
     });
+
+    const cf = el.querySelector('#cardsForm');
+    if (cf) {
+      cf.querySelector('#cList').addEventListener('change', (e) => { cards.listId = e.target.value; saveCards(cards); });
+      cf.querySelector('#cCount').addEventListener('change', (e) => { cards.count = e.target.value; saveCards(cards); });
+      cf.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!store.poolFor(cards.listId).length) return toast('Ten zestaw jest pusty. Wybierz inny.', 'error');
+        setCards({ listId: cards.listId, count: cards.count });
+        location.hash = '#/cards';
+      });
+    }
 
     const form = el.querySelector('#setup');
     if (!form) return;
