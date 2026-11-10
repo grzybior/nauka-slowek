@@ -25,6 +25,9 @@ export function mount(el) {
     location.hash = '#/quiz';
   }
 
+  // Przy liście "Na dziś" nie pokazujemy liczby, żeby nie sprawiała wrażenia zaległości.
+  const countLabel = (l) => (l.id === 'due' ? '' : ` (${store.poolFor(l.id).length})`);
+
   function render() {
     const s = store.state;
     const st = store.stats();
@@ -38,7 +41,7 @@ export function mount(el) {
     const sub = !st.words
       ? 'Zacznij od dodania pierwszych słówek.'
       : st.due
-        ? `Na dziś czeka ${st.due} ${plural(st.due, 'słówko', 'słówka', 'słówek')}.`
+        ? 'Czas na krótką powtórkę. Kilka minut wystarczy.'
         : 'Wszystko powtórzone. Świetna robota!';
 
     el.innerHTML = `
@@ -49,7 +52,7 @@ export function mount(el) {
 
       <div class="stats">
         <div class="stat"><span class="stat-ico t1">${icon('book', 18)}</span><div class="stat-num">${st.words}</div><div class="stat-lab">${plural(st.words, 'słówko', 'słówka', 'słówek')} w bazie</div></div>
-        <div class="stat"><span class="stat-ico t2">${icon('repeat', 18)}</span><div class="stat-num">${st.due}</div><div class="stat-lab">na dziś</div></div>
+        <div class="stat"><span class="stat-ico t2">${icon('sparkles', 18)}</span><div class="stat-num">${st.mastered}</div><div class="stat-lab">${plural(st.mastered, 'słówko opanowane', 'słówka opanowane', 'słówek opanowanych')}</div></div>
         <div class="stat"><span class="stat-ico t3">${icon('flame', 18)}</span><div class="stat-num">${st.streak}</div><div class="stat-lab">${plural(st.streak, 'dzień', 'dni', 'dni')} z rzędu</div></div>
         <div class="stat"><span class="stat-ico t4">${icon('target', 18)}</span><div class="stat-num">${st.accuracy === null ? '—' : st.accuracy + '%'}</div><div class="stat-lab">skuteczność (10 ostatnich)</div></div>
       </div>
@@ -66,14 +69,14 @@ export function mount(el) {
       </div>` : `
       ${st.due ? `
       <div class="card cta">
-        <div><h2>Powtórka na dziś</h2><p>${st.due} ${plural(st.due, 'słówko', 'słówka', 'słówek')} gotowych do powtórzenia. Krótka sesja robi największą różnicę.</p></div>
+        <div><h2>Powtórka na dziś</h2><p>Krótka sesja robi największą różnicę. Zaczynamy od słówek, które najbardziej potrzebują powtórki.</p></div>
         <button class="btn btn-light btn-lg" id="btnQuick">${icon('play', 18)} Zacznij powtórkę</button>
       </div>` : ''}
 
       <form class="card fc-setup" id="cardsForm">
         <div class="fc-setup-text"><h2>Fiszki</h2><p class="muted">Poznawaj słówka bez oceniania. Nie wpływają na powtórki ani quizy.</p></div>
         <div class="fc-setup-ctl">
-          <select id="cList" class="select" aria-label="Zestaw fiszek">${lists.map((l) => `<option value="${esc(l.id)}" ${l.id === cards.listId ? 'selected' : ''}>${esc(l.name)} (${store.poolFor(l.id).length})</option>`).join('')}</select>
+          <select id="cList" class="select" aria-label="Zestaw fiszek">${lists.map((l) => `<option value="${esc(l.id)}" ${l.id === cards.listId ? 'selected' : ''}>${esc(l.name)}${countLabel(l)}</option>`).join('')}</select>
           <select id="cCount" class="select" aria-label="Liczba fiszek">${CARD_COUNTS.map((c) => `<option value="${c}" ${c === String(cards.count) ? 'selected' : ''}>${c === 'all' ? 'Wszystkie' : c + ' fiszek'}</option>`).join('')}</select>
           <button class="btn btn-ghost" type="submit">${icon('book', 18)} Ucz się</button>
         </div>
@@ -83,7 +86,7 @@ export function mount(el) {
         <h2>Nowy quiz</h2>
         <div class="field">
           <label for="fList">Zestaw słówek</label>
-          <select id="fList" class="select">${lists.map((l) => `<option value="${esc(l.id)}" ${l.id === draft.listId ? 'selected' : ''}>${esc(l.name)} (${store.poolFor(l.id).length})</option>`).join('')}</select>
+          <select id="fList" class="select">${lists.map((l) => `<option value="${esc(l.id)}" ${l.id === draft.listId ? 'selected' : ''}>${esc(l.name)}${countLabel(l)}</option>`).join('')}</select>
         </div>
         <div class="setup-grid">
           <div class="field"><label>Kierunek</label>${seg('direction', [['enpl', dirLabel('enpl', store.state.lang)], ['plen', dirLabel('plen', store.state.lang)], ['both', 'Oba']], draft.direction)}</div>
@@ -124,7 +127,7 @@ export function mount(el) {
     el.querySelector('#countField').hidden = draft.mode !== 'standard';
     el.querySelector('#timeField').hidden = draft.mode !== 'challenge';
     const n = store.poolFor(draft.listId).length;
-    el.querySelector('#poolInfo').textContent = `${n} ${plural(n, 'słówko', 'słówka', 'słówek')} w zestawie`;
+    el.querySelector('#poolInfo').textContent = draft.listId === 'due' ? 'Słówka do powtórki' : `${n} ${plural(n, 'słówko', 'słówka', 'słówek')} w zestawie`;
   }
 
   function bind() {
